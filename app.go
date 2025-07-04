@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rivo/tview"
+	"github.com/gdamore/tcell/v2"
 )
 
 // App represents the application state
@@ -38,6 +39,65 @@ func NewApp() *App {
 	a.LoadVMs()
 	
 	return a
+}
+
+// setupKeybindings sets up keyboard event handlers
+func (a *App) setupKeybindings() {
+	a.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyCtrlC:
+			a.Stop()
+			return nil
+		case tcell.KeyEsc:
+			if a.showHelp {
+				a.toggleHelp()
+				return nil
+			}
+			a.Stop()
+			return nil
+		case tcell.KeyEnter:
+			a.connectToSelected()
+			return nil
+		case tcell.KeyCtrlS:
+			a.toggleVMState()
+			return nil
+		case tcell.KeyCtrlR:
+			a.restartSelected()
+			return nil
+		case tcell.KeyCtrlD:
+			a.deleteSelected()
+			return nil
+		case tcell.KeyCtrlT:
+			a.ToggleTheme()
+			return nil
+		}
+		
+		switch event.Rune() {
+		case 'q':
+			a.Stop()
+			return nil
+		case 'h', '?':
+			a.toggleHelp()
+			return nil
+		case 'r':
+			a.Refresh()
+			return nil
+		case 't':
+			a.ToggleTheme()
+			return nil
+		case 's':
+			a.toggleVMState()
+			return nil
+		case 'd':
+			a.deleteSelected()
+			return nil
+		case 'c':
+			a.connectToSelected()
+			return nil
+		}
+		
+		return event
+	})
 }
 
 // Run starts the application
