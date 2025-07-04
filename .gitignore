@@ -1,0 +1,15 @@
+# Binaries
+lima-tui*
+*.exe
+
+# Go build cache
+.cache/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
