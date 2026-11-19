@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/davidusken/lima-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/davidusken/lima-tui/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/davidusken/lima-tui)](https://github.com/davidusken/lima-tui/releases/latest)
-[![Go Report Card](https://goreportcard.com/badge/github.com/davidusken/lima-tui)](https://goreportcard.com/report/github.com/davidusken/lima-tui)
+[![Go version](https://img.shields.io/github/go-mod/go-version/davidusken/lima-tui)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A terminal UI for [Lima](https://lima-vm.io/) VMs, in the spirit of k9s.
