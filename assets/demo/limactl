@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# A stand-in for limactl, used to record the README demo (see record.sh)
+# without touching real VMs. It knows just enough of limactl for lima-tui:
+# --version, list --format json, start, stop, restart, delete and shell.
+# VM state lives in $LIMA_TUI_DEMO_STATE, one file per VM:
+#   status sshPort cpus memoryGiB diskGiB
+set -euo pipefail
+
+state=${LIMA_TUI_DEMO_STATE:?set LIMA_TUI_DEMO_STATE to the demo state dir}
+gib=$((1 << 30))
+
+# lima-tui always passes --log-format json first.
+if [[ ${1:-} == --log-format ]]; then shift 2; fi
+
+set_status() { # name status port
+	read -r _ _ cpus mem disk <"$state/$1"
+	echo "$2 $3 $cpus $mem $disk" >"$state/$1"
+}
+
+case ${1:-} in
+--version)
+	echo "limactl version 2.0.3"
+	;;
+list)
+	for f in "$state"/*; do
+		[[ -f $f ]] || continue
+		name=$(basename "$f")
+		read -r status port cpus mem disk <"$f"
+		printf '{"name":"%s","status":"%s","dir":"%s","vmType":"vz","arch":"aarch64","cpus":%d,"memory":%d,"disk":%d,"sshAddress":"127.0.0.1","sshLocalPort":%d}\n' \
+			"$name" "$status" "$HOME/.lima/$name" "$cpus" $((mem * gib)) $((disk * gib)) "$port"
+	done
+	;;
+start)
+	sleep 2.5
+	set_status "$2" Running $((60000 + RANDOM % 5000))
+	;;
+stop)
+	sleep 1.5
+	set_status "$2" Stopped 0
+	;;
+restart)
+	sleep 2.5
+	;;
+delete)
+	sleep 1
+	rm -f "$state/${*: -1}"
+	;;
+shell)
+	rc=$(mktemp)
+	cat >"$rc" <<EOF
+PS1='\[\e[32m\]demo@lima-$2\[\e[0m\]:\[\e[34m\]~\[\e[0m\]\$ '
+uname() { echo "Linux lima-$2 6.8.0-49-generic #49-Ubuntu SMP aarch64 GNU/Linux"; }
+EOF
+	echo "Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-49-generic aarch64)"
+	echo
+	HOME=/nonexistent bash --noprofile --rcfile "$rc" -i
+	rm -f "$rc"
+	;;
+*)
+	echo "demo limactl: unsupported command: $*" >&2
+	exit 1
+	;;
+esac

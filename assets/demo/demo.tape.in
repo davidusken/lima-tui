@@ -1,0 +1,68 @@
+# VHS tape for the README screenshot and demo GIF. Not run directly:
+# record.sh fills in the @…@ placeholders once per colour scheme.
+
+Output "@OUT@.gif"
+
+Set Shell "bash"
+Set Theme "@VHS_THEME@"
+Set FontSize 16
+Set Width 1240
+Set Height 560
+Set Padding 16
+Set WindowBar Colorful
+Set BorderRadius 8
+Set TypingSpeed 60ms
+
+Hide
+Type "export PATH=@DEMO_DIR@:$PATH LIMA_TUI_DEMO_STATE=@STATE@ XDG_CONFIG_HOME=@CONFIG@ PS1='$ ' && clear"
+Enter
+# clear first, so the shell step doesn't show this command line behind it.
+Type "clear && @BIN@ --skin @SKIN@"
+Enter
+Sleep 1.5s
+Show
+
+# Still frame for the README screenshot.
+Screenshot "@OUT@.png"
+Sleep 1.5s
+
+# Key help
+Type "?"
+Sleep 2.5s
+Type "?"
+Sleep 0.5s
+
+# Start a stopped VM (k3s)
+Down 2
+Sleep 0.6s
+Ctrl+S
+Sleep 3.5s
+
+# Open a shell in a running VM (default), and come back
+Type "g"
+Sleep 0.3s
+Down
+Sleep 0.6s
+Enter
+Sleep 1s
+Type "uname -a"
+Sleep 0.3s
+Enter
+Sleep 1.5s
+Type "exit"
+Sleep 0.3s
+Enter
+Sleep 1.5s
+
+# Delete a VM (test-vm, the last one; asks first)
+Type "G"
+Sleep 0.6s
+Ctrl+D
+Sleep 2s
+Tab
+Sleep 0.5s
+Enter
+Sleep 2.5s
+
+Type "q"
+Sleep 0.5s

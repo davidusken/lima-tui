@@ -1,4 +1,4 @@
-.PHONY: build run install fmt vet test lint check snapshot clean
+.PHONY: build run install fmt vet test lint check snapshot demo clean
 
 build:
 	go build -o lima-tui .
@@ -27,6 +27,11 @@ check: fmt vet test build
 # Build a local release (all platforms) into dist/ without publishing
 snapshot:
 	goreleaser release --snapshot --clean
+
+# Re-record the README screenshots and demo GIFs (needs vhs; uses a fake
+# limactl, so no real VM is touched)
+demo:
+	./assets/demo/record.sh
 
 clean:
 	rm -rf lima-tui dist/

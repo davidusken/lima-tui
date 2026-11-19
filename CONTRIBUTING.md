@@ -61,9 +61,23 @@ Commits starting with `docs:`, `chore:` or `test:` are left out of release notes
 | `skin.go` | Parsing YAML skins and loading the theme list |
 | `config.go` | Config folder, `config.yaml`, and resolving `--skin` / `skin:` |
 | `vm.go` | Talking to `limactl` and formatting its output |
+| `assets/` | README screenshots and demo GIFs; `assets/demo/` records them |
 
 All `limactl` calls run off the UI goroutine; UI state is only changed inside
 `QueueUpdateDraw` or key handlers.
+
+Tests never run the real `limactl`: the app calls it through its `listVMs` and
+`runCommand` fields, which `newTestApp` replaces with fakes. For code that
+reports back through `QueueUpdateDraw`, `loop_test.go` runs the real event loop
+on a simulated screen (`startLoop`, `onLoop`, `eventually`).
+
+## Screenshots and demo GIFs
+
+If you change how the UI looks, re-record the README images with `make demo`
+(needs [VHS](https://github.com/charmbracelet/vhs): `brew install vhs`). It runs
+`assets/demo/demo.tape.in` once per colour scheme against a fake `limactl`
+(`assets/demo/limactl`) with made-up VMs, so your own VMs are neither touched
+nor shown.
 
 ## Adding a colour or a skin
 

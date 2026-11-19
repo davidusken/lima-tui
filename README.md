@@ -9,7 +9,11 @@ A terminal UI for [Lima](https://lima-vm.io/) VMs, in the spirit of k9s.
 See all your instances at a glance, start, stop, restart or delete them, and jump
 into a shell, without typing `limactl` commands.
 
-![lima-tui](interface-dark.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.gif">
+  <source media="(prefers-color-scheme: light)" srcset="assets/demo-light.gif">
+  <img alt="lima-tui listing Lima VMs, starting one, opening a shell in another and deleting a third" src="assets/demo-dark.gif">
+</picture>
 
 ## Features
 
@@ -57,7 +61,7 @@ lima-tui
 | `?`, `h` | Toggle the key help panel |
 | `Esc` | Close the help panel |
 | `Ctrl+E` | Hide/show the header with key hints |
-| `q`, `Ctrl+C` | Quit |
+| `q`, `Ctrl+C` | Quit (asks first while a start/stop/delete is still running) |
 
 Actions that change a VM need Ctrl, so a stray key press can't stop one.
 
@@ -65,8 +69,13 @@ Actions that change a VM need Ctrl, so a stray key press can't stop one.
 
 ## Themes and skins
 
-lima-tui has two built-in themes, `dark` (the default) and `light`. You can add
-your own as YAML skins, much like k9s skins:
+lima-tui has two built-in themes, `dark` (the default) and `light`:
+
+| `dark` | `light` |
+|---|---|
+| ![lima-tui with the dark theme](assets/interface-dark.png) | ![lima-tui with the light theme](assets/interface-light.png) |
+
+You can add your own as YAML skins, much like k9s skins:
 
 1. Put a skin file in `~/.config/lima-tui/skins/<name>.yaml`
    (or `$XDG_CONFIG_HOME/lima-tui/skins/` if you set `XDG_CONFIG_HOME`).
@@ -101,8 +110,8 @@ button:   { fg: white, bg: darkblue }    # delete dialog buttons
 status:
   running: green
   stopped: red
-  starting: yellow
-  stopping: orange
+  starting: yellow     # also used while restarting
+  stopping: orange     # also used while deleting
 ```
 
 Colours are W3C names (`aqua`, `darkslategray`, …), `"#rrggbb"`, or `default`
