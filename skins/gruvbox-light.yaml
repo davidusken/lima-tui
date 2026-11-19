@@ -1,0 +1,22 @@
+# gruvbox-light: the light variant of the Gruvbox palette (https://github.com/morhetz/gruvbox).
+#
+# Copy to ~/.config/lima-tui/skins/ and start with: lima-tui --skin gruvbox-light
+
+bg: "#fbf1c7"       # bg
+fg: "#3c3836"       # fg1
+dim: "#7c6f64"      # fg4
+title: "#076678"    # blue
+header:
+  fg: "#fbf1c7"
+  bg: "#504945"     # bg2 (dark)
+selected:
+  fg: "#fbf1c7"
+  bg: "#427b58"     # aqua
+button:
+  fg: "#fbf1c7"
+  bg: "#076678"
+status:
+  running: "#79740e"   # green
+  stopped: "#9d0006"   # red
+  starting: "#b57614"  # yellow
+  stopping: "#af3a03"  # orange

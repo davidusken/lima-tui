@@ -1,123 +1,122 @@
-# Lima TUI
+# lima-tui
 
-A modern Terminal User Interface for managing Lima VMs, inspired by k9s.
+[![CI](https://github.com/davidusken/lima-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/davidusken/lima-tui/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/davidusken/lima-tui)](https://github.com/davidusken/lima-tui/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/davidusken/lima-tui)](https://goreportcard.com/report/github.com/davidusken/lima-tui)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Essentially a TUI created in Go with the tview framework. The idea was to improve the built in `limactl list` command 
-with features such as:
+A terminal UI for [Lima](https://lima-vm.io/) VMs, in the spirit of k9s.
+See all your instances at a glance, start, stop, restart or delete them, and jump
+into a shell, without typing `limactl` commands.
 
-- Real-time VM overview
-- Intuitive controls for navigation
-- VM controls, start/stop/restart
-- Connecting to VMs 
+![lima-tui](interface-dark.png)
+
+## Features
+
+- Live list of all Lima instances, refreshed every few seconds
+- Start/stop, restart and delete (with confirmation) from the keyboard
+- Open a shell in a VM and come back to the list when you exit
+- Errors from `limactl` shown in the status bar
+- Light and dark themes, plus your own colour skins
 
 ## Installation
 
-Requires [Lima](https://lima-vm.io/) installed, with `limactl` on your `PATH`.
+Requires [Lima](https://lima-vm.io/docs/installation/) with `limactl` on your `PATH`.
 
-### Homebrew (macOS)
+**Homebrew** (macOS)
+
 ```bash
 brew install davidusken/tap/lima-tui
 ```
 
-### Go
+**Go** (1.26+)
+
 ```bash
 go install github.com/davidusken/lima-tui@latest
 ```
 
-### Prebuilt binaries
-Download the archive for your platform (macOS/Linux, amd64/arm64) from the
-[releases page](https://github.com/davidusken/lima-tui/releases), extract it and
-put `lima-tui` somewhere on your `PATH`.
-
-### Build from source
-```bash
-git clone https://github.com/davidusken/lima-tui.git
-cd lima-tui
-make build     # or: go build .
-```
+**Prebuilt binaries** for macOS and Linux (amd64/arm64) are on the
+[releases page](https://github.com/davidusken/lima-tui/releases/latest).
 
 ## Usage
 
 ```bash
-lima-tui            # start the TUI
-lima-tui --version  # print version
+lima-tui
 ```
 
-## Controls
+| Key | Action |
+|---|---|
+| `↑`/`↓`, `j`/`k` | Select VM |
+| `g` / `G` | First / last VM |
+| `Enter`, `c` | Open a shell in the VM (`limactl shell`) |
+| `s` | Start or stop the VM |
+| `R` | Restart the VM |
+| `d` | Delete the VM (asks first; a running VM is shut down) |
+| `r` | Refresh now |
+| `t` | Next theme/skin |
+| `h`, `?` | Toggle the key help panel |
+| `Esc` | Close the help panel |
+| `Ctrl+E` | Hide/show the header with key hints |
+| `q`, `Ctrl+C` | Quit |
 
-### Navigation
-- `↑`/`k` - Move selection up
-- `↓`/`j` - Move selection down
+`lima-tui --version` prints the installed version.
 
-### VM Operations
-- `Enter`/`Space` - Toggle VM (start if stopped, stop if running)
-- `s` - Start selected VM
-- `t` - Stop selected VM  
-- `r` - Restart selected VM
-- `d` - Delete selected VM
-- `c` - Connect to VM via SSH
+## Themes and skins
 
-### Management
-- `n` - Create new VM (opens external script)
-- `R` - Force refresh VM list
-- `h`/`?` - Toggle help screen
-- `q`/`Ctrl+C` - Quit
+lima-tui has two built-in themes, `dark` (the default) and `light`. You can add
+your own as YAML skins, much like k9s skins:
 
-## Interface
+1. Put a skin file in `~/.config/lima-tui/skins/<name>.yaml`
+   (or `$XDG_CONFIG_HOME/lima-tui/skins/` if you set `XDG_CONFIG_HOME`).
+2. Start with it: `lima-tui --skin <name>`, or make it the default in
+   `~/.config/lima-tui/config.yaml`:
 
-The default theme is the dark theme.
+   ```yaml
+   skin: solarized-dark
+   ```
 
-### Light 
+   `--skin` wins over the config file. It also takes a path to a skin file
+   (`lima-tui --skin ./my-skin.yaml`), handy while you're editing one. A bare
+   file name that isn't in the current directory is looked up in the skins folder.
+   In `config.yaml`, relative paths are relative to the config folder
+   (`foo.yaml` means `skins/foo.yaml`), and `~/` works.
 
-![Light Interface](interface-light.png)
+Press `t` to cycle through the built-ins and every skin in the skins folder.
 
-### Dark
+Ready-made skins are in [`skins/`](skins/): `transparent` (keeps your
+terminal's own background and colours), `solarized-dark` and `gruvbox-light`.
 
-![Dark Interface](interface-dark.png)
+A skin sets any of these keys; anything left out keeps the dark theme's colour:
 
-## Development
-
-### File Structure
+```yaml
+bg: default          # background
+fg: "#c0caf5"        # normal text
+dim: gray            # borders, status bar, secondary text
+title: aqua          # panel titles
+header:   { fg: white, bg: darkgreen }   # table header row
+selected: { fg: black, bg: aqua }        # selected row
+button:   { fg: white, bg: darkblue }    # delete dialog buttons
+status:
+  running: green
+  stopped: red
+  starting: yellow
+  stopping: orange
 ```
-lima-tui/
-├── main.go          # Application entry point
-├── app.go           # Core application logic
-├── ui.go            # User interface components
-├── actions.go       # VM operations and actions
-├── vm.go            # VM data structures and utilities
-├── theme.go         # UI theming and styling
-├── go.mod           # Go module definition
-├── go.sum           # Dependency versions (auto-generated)
-├── Makefile         # Build shortcuts
-├── .goreleaser.yaml # Release builds + Homebrew cask
-└── README.md        # This file
-```
 
-### Dependencies
-- [tview](https://github.com/rivo/tview) – Rich TUI framework
-- [tcell](https://github.com/gdamore/tcell) - Terminal cell-based display
+Colours are W3C names (`aqua`, `darkslategray`, …), `"#rrggbb"`, or `default`
+for the terminal's own colour (`bg: default` gives a transparent background).
+`"-"` also means default, but has to be quoted. Quote hex values too, since `#`
+starts a YAML comment. Unknown keys or colours are reported at startup.
 
 ## Troubleshooting
 
-### VMs not showing up
-- Ensure `limactl list` works in your terminal
-- Check that Lima is properly installed
-- Verify VM permissions
-
-### Build issues
-- Ensure Go 1.26+ is installed: `go version`
-- Run `go mod tidy` to fix dependencies
-- Check network access for Go modules
+- **"limactl not found"**: install Lima, or make sure `limactl` is on the `PATH` of the shell you start lima-tui from.
+- **No VMs listed**: check that `limactl list` shows them. lima-tui reads the same list.
+- **An action fails**: the status bar shows the error from `limactl`. Run the same command by hand (e.g. `limactl start myvm`) for the full log.
 
 ## Contributing
 
-Pull requests are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Releasing
-
-Push a tag like `v1.1.0`. The `release` workflow runs GoReleaser, which builds
-the binaries, publishes a GitHub release and updates the Homebrew tap.
-Run `make snapshot` to try the release build locally without publishing.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

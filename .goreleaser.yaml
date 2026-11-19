@@ -23,6 +23,7 @@ archives:
     files:
       - LICENSE
       - README.md
+      - skins/*.yaml
 
 checksum:
   name_template: checksums.txt

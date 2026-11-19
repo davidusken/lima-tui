@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: lima-tui version
+      description: Output of `lima-tui --version`
+    validations:
+      required: true
+  - type: input
+    id: lima
+    attributes:
+      label: Lima version
+      description: Output of `limactl --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: e.g. iTerm2, Ghostty, Terminal.app, tmux inside Alacritty
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, `limactl list` output, error text from the status bar.

@@ -1,9 +1,15 @@
+// Command lima-tui is a terminal UI for managing Lima virtual machines.
 package main
 
 import (
+	"flag"
 	"fmt"
-	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/rivo/tview"
 )
 
 // Set at build time by GoReleaser via -ldflags.
@@ -14,34 +20,49 @@ var (
 )
 
 func main() {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "-v", "--version", "version":
-			fmt.Printf("lima-tui %s (commit %s, built %s)\n", version, commit, date)
-			return
-		case "-h", "--help", "help":
-			fmt.Println("Usage: lima-tui [--version]\n\nA terminal UI for Lima VMs. Press h or ? inside the app for key bindings.")
-			return
-		}
+	showVersion := flag.Bool("version", false, "print version and exit")
+	skin := flag.String("skin", "", "theme to start with: dark, light, a skin name from "+
+		filepath.Join(configDir(), "skins")+", or a path to a skin file")
+	flag.Usage = func() {
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: lima-tui [--skin name] [--version]\n\n"+
+			"A terminal UI for Lima VMs. Press ? inside the app for key bindings.\n\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("lima-tui %s (commit %s, built %s)\n", version, commit, date)
+		return
 	}
 
-	for {
-		app := NewApp()
-		exitCode := app.Run()
-		
-		// If app.Run() returns an error, exit
-		if exitCode != nil {
-			log.Fatal(exitCode)
-		}
-		
-		// Check if we should exit or restart
-		if app.ShouldExit() {
-			fmt.Println("Exiting application...")
-			os.Exit(0)
-		}
-		
-		// If we get here, user wanted to connect to a VM and we've returned
-		// The application loop will restart to show the VM list again
-		fmt.Println("Returned from VM connection. Restarting application...")
+	if _, err := exec.LookPath("limactl"); err != nil {
+		fmt.Fprintln(os.Stderr, "lima-tui: limactl not found in PATH. Install Lima first: https://lima-vm.io/docs/installation/")
+		os.Exit(1)
 	}
+
+	dir := configDir()
+	cfg, err := loadConfig(dir)
+	if err != nil {
+		fail(err)
+	}
+	if *skin == "" {
+		*skin = configSkin(dir, cfg.Skin)
+	}
+	themes, idx, warnings, err := loadThemes(dir, *skin)
+	if err != nil {
+		fail(err)
+	}
+	var notice string
+	if len(warnings) > 0 {
+		notice = "[red]" + tview.Escape(strings.Join(warnings, "; ")) + "[-]"
+	}
+
+	if err := NewApp(themes, idx, notice).Run(); err != nil {
+		fail(err)
+	}
+}
+
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, "lima-tui:", err)
+	os.Exit(1)
 }

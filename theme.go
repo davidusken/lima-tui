@@ -5,85 +5,115 @@ import (
 	"github.com/rivo/tview"
 )
 
-// applyTheme applies the current theme to all UI components
+// theme is a full set of UI colours. Built-in themes are below; user skins
+// (skin.go) are layered on top of darkTheme.
+type theme struct {
+	name        string
+	bg, fg, dim tcell.Color
+	headerFg    tcell.Color
+	headerBg    tcell.Color
+	title       tcell.Color
+	selectedFg  tcell.Color
+	selectedBg  tcell.Color
+	buttonFg    tcell.Color
+	buttonBg    tcell.Color
+	running     tcell.Color
+	stopped     tcell.Color
+	starting    tcell.Color
+	stopping    tcell.Color
+}
+
+var (
+	darkTheme = theme{
+		name: "dark",
+		bg:   tcell.ColorBlack, fg: tcell.ColorWhite, dim: tcell.ColorLightGray,
+		headerFg: tcell.ColorWhite, headerBg: tcell.ColorDarkGreen,
+		title:      tcell.ColorAqua,
+		selectedFg: tcell.ColorBlack, selectedBg: tcell.ColorAqua,
+		buttonFg: tcell.ColorWhite, buttonBg: tcell.ColorDarkBlue,
+		running: tcell.ColorGreen, stopped: tcell.ColorRed,
+		starting: tcell.ColorYellow, stopping: tcell.ColorOrange,
+	}
+	lightTheme = theme{
+		name: "light",
+		bg:   tcell.ColorWhite, fg: tcell.ColorBlack, dim: tcell.ColorDarkGray,
+		headerFg: tcell.ColorWhite, headerBg: tcell.ColorDarkSlateGray,
+		title:      tcell.ColorDarkBlue,
+		selectedFg: tcell.ColorWhite, selectedBg: tcell.ColorBlue,
+		buttonFg: tcell.ColorBlack, buttonBg: tcell.ColorLightGray,
+		running: tcell.ColorGreen, stopped: tcell.ColorRed,
+		starting: tcell.ColorYellow, stopping: tcell.ColorOrange,
+	}
+	builtinThemes = []theme{darkTheme, lightTheme}
+)
+
+func (a *App) theme() theme {
+	return a.themes[a.themeIdx]
+}
+
+// statusColor is the text colour for a VM status cell: a limactl status, or
+// the action lima-tui is running on the VM.
+func (t theme) statusColor(status string) tcell.Color {
+	switch status {
+	case statusRunning:
+		return t.running
+	case statusStopped:
+		return t.stopped
+	case actStarting, actRestarting:
+		return t.starting
+	case actStopping, actDeleting:
+		return t.stopping
+	default:
+		return t.fg
+	}
+}
+
+// colorTag returns c as a tview colour tag value ("green", "#c0caf5", or "-"
+// for the terminal default).
+func colorTag(c tcell.Color) string {
+	if !c.Valid() {
+		return "-"
+	}
+	return c.String()
+}
+
+// applyTheme colours every widget for the current theme.
 func (a *App) applyTheme() {
-	if a.lightMode {
-		// Light mode colors (for white terminal backgrounds)
-		tview.Styles.PrimitiveBackgroundColor = tcell.ColorWhite
-		tview.Styles.ContrastBackgroundColor = tcell.ColorLightGray
-		tview.Styles.MoreContrastBackgroundColor = tcell.ColorDarkGray
-		tview.Styles.BorderColor = tcell.ColorDarkGray
-		tview.Styles.TitleColor = tcell.ColorDarkBlue
-		tview.Styles.GraphicsColor = tcell.ColorDarkGray
-		tview.Styles.PrimaryTextColor = tcell.ColorBlack
-		tview.Styles.SecondaryTextColor = tcell.ColorDarkGray
-		tview.Styles.TertiaryTextColor = tcell.ColorGray
-		tview.Styles.InverseTextColor = tcell.ColorWhite
-	} else {
-		// Dark mode colors (for dark terminal backgrounds)
-		tview.Styles.PrimitiveBackgroundColor = tcell.ColorBlack
-		tview.Styles.ContrastBackgroundColor = tcell.ColorDarkBlue
-		tview.Styles.MoreContrastBackgroundColor = tcell.ColorBlue
-		tview.Styles.BorderColor = tcell.ColorWhite
-		tview.Styles.TitleColor = tcell.ColorYellow
-		tview.Styles.GraphicsColor = tcell.ColorWhite
-		tview.Styles.PrimaryTextColor = tcell.ColorWhite
-		tview.Styles.SecondaryTextColor = tcell.ColorLightGray
-		tview.Styles.TertiaryTextColor = tcell.ColorGray
-		tview.Styles.InverseTextColor = tcell.ColorBlack
-	}
+	t := a.theme()
 
-	a.applyTableTheme()
-	a.applyComponentTheme()
+	// Defaults for widgets created later (e.g. the delete dialog).
+	tview.Styles.PrimitiveBackgroundColor = t.bg
+	tview.Styles.ContrastBackgroundColor = t.buttonBg
+	tview.Styles.PrimaryTextColor = t.fg
+	tview.Styles.SecondaryTextColor = t.dim
+	tview.Styles.BorderColor = t.dim
+	tview.Styles.TitleColor = t.title
+
+	a.table.SetBackgroundColor(t.bg)
+	a.table.SetBorderColor(t.dim)
+	a.table.SetTitleColor(t.title)
+	a.table.SetSelectedStyle(tcell.StyleDefault.Foreground(t.selectedFg).Background(t.selectedBg).Bold(true))
+
+	a.statusBar.SetBackgroundColor(t.bg)
+	a.statusBar.SetTextColor(t.dim)
+
+	a.helpText.SetBackgroundColor(t.bg)
+	a.helpText.SetTextColor(t.fg)
+	a.helpText.SetBorderColor(t.dim)
+	a.helpText.SetTitleColor(t.title)
+	a.helpText.SetText(helpText(t))
+
+	a.root.SetBackgroundColor(t.bg)
+	a.header.SetBackgroundColor(t.bg)
+	a.headerInfo.SetBackgroundColor(t.bg)
+	a.headerKeys.SetBackgroundColor(t.bg)
 }
 
-// applyTableTheme applies theme to the table
-func (a *App) applyTableTheme() {
-	if a.lightMode {
-		// Light mode table styling
-		a.table.SetSelectedStyle(tcell.StyleDefault.
-			Foreground(tcell.ColorWhite).
-			Background(tcell.ColorBlue).
-			Attributes(tcell.AttrBold))
-		a.table.SetBorderColor(tcell.ColorDarkGray)
-		a.table.SetTitleColor(tcell.ColorDarkBlue)
-		a.table.SetBackgroundColor(tcell.ColorWhite)
-	} else {
-		// Dark mode table styling
-		a.table.SetSelectedStyle(tcell.StyleDefault.
-			Foreground(tcell.ColorBlack).
-			Background(tcell.ColorAqua).
-			Attributes(tcell.AttrBold))
-		a.table.SetBorderColor(tcell.ColorWhite)
-		a.table.SetTitleColor(tcell.ColorAqua)
-		a.table.SetBackgroundColor(tcell.ColorBlack)
-	}
-}
-
-// applyComponentTheme applies theme to other UI components
-func (a *App) applyComponentTheme() {
-	if a.lightMode {
-		// Light mode component styling - better for iTerm2
-		a.statusBar.SetBackgroundColor(tcell.ColorWhite)
-		a.statusBar.SetTextColor(tcell.ColorDarkGray)
-		a.helpText.SetBackgroundColor(tcell.ColorWhite)
-		a.helpText.SetTextColor(tcell.ColorBlack)
-		a.helpText.SetBorderColor(tcell.ColorDarkGray)
-		a.helpText.SetTitleColor(tcell.ColorDarkBlue)
-	} else {
-		// Dark mode component styling - better for iTerm2
-		a.statusBar.SetBackgroundColor(tcell.ColorBlack)
-		a.statusBar.SetTextColor(tcell.ColorLightGray)
-		a.helpText.SetBackgroundColor(tcell.ColorBlack)
-		a.helpText.SetTextColor(tcell.ColorLightGray)
-		a.helpText.SetBorderColor(tcell.ColorLightGray)
-		a.helpText.SetTitleColor(tcell.ColorAqua)
-	}
-}
-
-// ToggleTheme toggles between light and dark theme
-func (a *App) ToggleTheme() {
-	a.lightMode = !a.lightMode
+// cycleTheme switches to the next built-in theme or loaded skin.
+func (a *App) cycleTheme() {
+	a.themeIdx = (a.themeIdx + 1) % len(a.themes)
 	a.applyTheme()
-	a.updateTable() // Refresh table to apply new colors
+	a.renderTable()
+	a.renderHeader()
+	a.setMessage("Theme: " + tview.Escape(a.theme().name))
 }

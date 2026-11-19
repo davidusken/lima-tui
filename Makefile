@@ -1,4 +1,4 @@
-.PHONY: build run install fmt vet snapshot clean
+.PHONY: build run install fmt vet test lint check snapshot clean
 
 build:
 	go build -o lima-tui .
@@ -10,10 +10,19 @@ install:
 	go install .
 
 fmt:
-	go fmt ./...
+	gofmt -l -w .
 
 vet:
 	go vet ./...
+
+test:
+	go test -race ./...
+
+lint:
+	golangci-lint run
+
+# Everything CI checks, except lint (needs golangci-lint installed)
+check: fmt vet test build
 
 # Build a local release (all platforms) into dist/ without publishing
 snapshot:

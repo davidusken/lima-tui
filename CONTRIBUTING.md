@@ -28,17 +28,17 @@ make build    # build ./lima-tui
 
 1. Fork the repo and create a branch from `main`.
 2. Keep the change focused: one fix or feature per PR.
-3. Run these before pushing:
+3. Run the checks before pushing:
    ```bash
-   make fmt
-   make vet
-   make build
+   make check   # gofmt, go vet, tests (with -race), build
+   make lint    # golangci-lint, if you have it installed
    ```
-4. Try your change against real Lima VMs (start/stop/connect, both themes if you touched the UI).
-5. Update `README.md` if you change key bindings, flags or behaviour.
+4. Try your change against real Lima VMs (start/stop/connect, both built-in themes and a skin with `bg: default` if you touched the UI).
+5. If you change key bindings, update `handleKey` in `app.go`, `keyHelp` in `ui.go`,
+   `headerHints` in `header.go` and the table in `README.md`.
 6. Open the PR with a short description of what changed and why. Screenshots help for UI changes.
 
-CI runs `go vet` and `go build` on every PR.
+CI checks gofmt and runs vet, tests and golangci-lint on macOS and Linux for every PR.
 
 ### Commit messages
 
@@ -46,10 +46,36 @@ Short, imperative summaries are preferred, optionally with a prefix:
 `fix: handle VMs with no IP`, `feat: add filter by status`, `docs: …`, `chore: …`.
 Commits starting with `docs:`, `chore:` or `test:` are left out of release notes.
 
+## Code layout
+
+| File | What's in it |
+|---|---|
+| `main.go` | Flags and startup |
+| `app.go` | App state, key handling, background refresh, status bar |
+| `actions.go` | Connect, start/stop, restart, delete |
+| `ui.go` | Layout, table rendering, help panel |
+| `header.go` | Info block and key hints at the top |
+| `theme.go` | The `theme` struct, built-in dark/light themes, applying a theme |
+| `skin.go` | Loading YAML skins and `config.yaml` |
+| `vm.go` | Talking to `limactl` and formatting its output |
+
+All `limactl` calls run off the UI goroutine; UI state is only changed inside
+`QueueUpdateDraw` or key handlers.
+
+## Adding a colour or a skin
+
+- A new themeable colour goes in three places: the `theme` struct and both
+  built-ins in `theme.go`, `skinFile` plus the `fields` table in `parseSkin`
+  (`skin.go`), and the skin key list in `README.md`.
+- Example skins live in `skins/`. `TestExampleSkins` loads every one of them, so
+  a typo fails `make check`. Name the palette's source in a comment at the top,
+  and stick to palettes whose licence lets us ship them.
+
 ## Releases
 
-Releases are cut by the maintainer by pushing a `vX.Y.Z` tag; GoReleaser builds the
-binaries and updates the Homebrew tap. You don't need to bump any version in your PR.
+The maintainer cuts releases by pushing a `vX.Y.Z` tag. GoReleaser then builds the
+binaries, publishes the GitHub release and updates the Homebrew tap. Don't bump any
+version in your PR.
 
 ## License
 

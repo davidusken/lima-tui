@@ -1,0 +1,18 @@
+# transparent: keeps your terminal's own background and text colour, so
+# lima-tui follows whatever colour scheme your terminal uses.
+#
+# Copy to ~/.config/lima-tui/skins/ and start with: lima-tui --skin transparent
+
+bg: default
+fg: default
+dim: gray
+title: teal
+header:
+  fg: default
+  bg: default
+selected:
+  fg: black
+  bg: teal
+button:
+  fg: white
+  bg: navy

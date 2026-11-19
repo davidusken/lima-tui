@@ -1,0 +1,22 @@
+# solarized-dark: Ethan Schoonover's Solarized palette (https://ethanschoonover.com/solarized/).
+#
+# Copy to ~/.config/lima-tui/skins/ and start with: lima-tui --skin solarized-dark
+
+bg: "#002b36"       # base03
+fg: "#839496"       # base0
+dim: "#586e75"      # base01
+title: "#268bd2"    # blue
+header:
+  fg: "#fdf6e3"     # base3
+  bg: "#073642"     # base02
+selected:
+  fg: "#002b36"
+  bg: "#2aa198"     # cyan
+button:
+  fg: "#fdf6e3"
+  bg: "#268bd2"
+status:
+  running: "#859900"   # green
+  stopped: "#dc322f"   # red
+  starting: "#b58900"  # yellow
+  stopping: "#cb4b16"  # orange
