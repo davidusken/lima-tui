@@ -7,17 +7,44 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
-
-	"github.com/rivo/tview"
 )
 
-// Set at build time by GoReleaser via -ldflags.
+// Set at build time by GoReleaser via -ldflags. Other builds fill them in
+// from the build info in init.
 var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
 )
+
+func init() {
+	if version != "dev" {
+		return
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		version, commit, date = versionFromBuildInfo(info, version, commit, date)
+	}
+}
+
+// versionFromBuildInfo covers builds without GoReleaser's ldflags, such as
+// `go install …@v1.2.0`: the module version and VCS stamp Go embeds in the
+// binary replace whichever defaults they have a value for.
+func versionFromBuildInfo(info *debug.BuildInfo, version, commit, date string) (string, string, string) {
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		version = v
+	}
+	for _, s := range info.Settings {
+		switch {
+		case s.Key == "vcs.revision" && s.Value != "":
+			commit = s.Value[:min(7, len(s.Value))]
+		case s.Key == "vcs.time" && s.Value != "":
+			date = s.Value
+		}
+	}
+	return version, commit, date
+}
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -55,7 +82,7 @@ func main() {
 	}
 	var notice string
 	if len(warnings) > 0 {
-		notice = "[red]" + tview.Escape(strings.Join(warnings, "; ")) + "[-]"
+		notice = colored(themes[idx].stopped, strings.Join(warnings, "; "))
 	}
 
 	if err := newApp(themes, idx, notice).run(); err != nil {

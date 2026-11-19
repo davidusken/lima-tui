@@ -1,14 +1,20 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
 )
 
+// newTestApp returns an app whose limactl calls fail, so a test can't run
+// the real limactl by accident. Tests that need them set fakes.
 func newTestApp() *app {
-	return newApp(builtinThemes, 0, "")
+	a := newApp(builtinThemes, 0, "")
+	a.listVMs = func() ([]instance, error) { return nil, errors.New("listVMs not faked") }
+	a.runCommand = func(...string) error { return errors.New("runCommand not faked") }
+	return a
 }
 
 func vmsNamed(names ...string) []instance {

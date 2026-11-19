@@ -87,10 +87,23 @@ func (a *app) confirmDelete() {
 		text += "\n\nThe VM is running and will be shut down without a clean stop."
 	}
 
+	a.confirm(text, "Delete", func() {
+		// Another action may have started while the dialog was open.
+		if a.busy[vm.Name] != "" {
+			a.setMessage(fmt.Sprintf("%s is busy; not deleted", vm.Name))
+			return
+		}
+		a.runLimactl(vm.Name, actDeleting, "Deleted", "delete", "--force", vm.Name)
+	})
+}
+
+// confirm shows a dialog with text and the buttons Cancel and ok, and calls
+// onOK if ok is chosen. Cancel has the focus, so Enter is the safe answer.
+func (a *app) confirm(text, ok string, onOK func()) {
 	t := a.theme()
 	modal := tview.NewModal().
 		SetText(text).
-		AddButtons([]string{"Cancel", "Delete"}).
+		AddButtons([]string{"Cancel", ok}).
 		SetBackgroundColor(t.bg).
 		SetTextColor(t.fg).
 		SetButtonBackgroundColor(t.buttonBg).
@@ -98,17 +111,10 @@ func (a *app) confirmDelete() {
 		SetDoneFunc(func(_ int, label string) {
 			a.pages.RemovePage(pageConfirm)
 			a.tv.SetFocus(a.table)
-			if label != "Delete" {
-				return
+			if label == ok {
+				onOK()
 			}
-			// Another action may have started while the dialog was open.
-			if a.busy[vm.Name] != "" {
-				a.setMessage(fmt.Sprintf("%s is busy; not deleted", vm.Name))
-				return
-			}
-			a.runLimactl(vm.Name, actDeleting, "Deleted", "delete", "--force", vm.Name)
 		})
-
 	a.pages.AddPage(pageConfirm, modal, false, true)
 }
 
@@ -133,17 +139,17 @@ func (a *app) selectedIdleVM() (instance, bool) {
 // event loop.
 func (a *app) runLimactl(name, act, done string, args ...string) {
 	a.busy[name] = act
-	a.setMessage("[yellow]" + tview.Escape(act+" "+name) + "…[-]")
+	a.setMessage(colored(a.theme().statusColor(act), act+" "+name+"…"))
 	a.renderTable()
 	go func() {
-		err := limactl(args...)
+		err := a.runCommand(args...)
 		a.tv.QueueUpdateDraw(func() {
 			delete(a.busy, name)
 			a.renderTable()
 			if err != nil {
 				a.setError(err)
 			} else {
-				a.setMessage("[green]" + tview.Escape(done+" "+name) + "[-]")
+				a.setMessage(colored(a.theme().running, done+" "+name))
 			}
 		})
 		a.refresh()

@@ -156,7 +156,7 @@ func shortenHome(path, home string) string {
 	return path
 }
 
-// sshEndpoint is what the Port column shows: just the port for localhost, host:port otherwise.
+// sshEndpoint is what the SSH column shows: just the port for localhost, host:port otherwise.
 func (v instance) sshEndpoint() string {
 	if v.SSHLocalPort == 0 {
 		return "-"

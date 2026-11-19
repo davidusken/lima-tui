@@ -36,13 +36,15 @@ var (
 	}
 	lightTheme = theme{
 		name: "light",
-		bg:   tcell.ColorWhite, fg: tcell.ColorBlack, dim: tcell.ColorDarkGray,
+		// W3C "darkgray" (#a9a9a9) is lighter than "gray"; dimgray reads on white.
+		bg: tcell.ColorWhite, fg: tcell.ColorBlack, dim: tcell.ColorDimGray,
 		headerFg: tcell.ColorWhite, headerBg: tcell.ColorDarkSlateGray,
 		title:      tcell.ColorDarkBlue,
 		selectedFg: tcell.ColorWhite, selectedBg: tcell.ColorBlue,
 		buttonFg: tcell.ColorBlack, buttonBg: tcell.ColorLightGray,
 		running: tcell.ColorGreen, stopped: tcell.ColorRed,
-		starting: tcell.ColorYellow, stopping: tcell.ColorOrange,
+		// Yellow and orange are near invisible on white.
+		starting: tcell.ColorDarkGoldenrod, stopping: tcell.ColorChocolate,
 	}
 	builtinThemes = []theme{darkTheme, lightTheme}
 )
@@ -75,6 +77,11 @@ func colorTag(c tcell.Color) string {
 		return "-"
 	}
 	return c.String()
+}
+
+// colored returns text, escaped, as a tview string in colour c.
+func colored(c tcell.Color, text string) string {
+	return "[" + colorTag(c) + "]" + tview.Escape(text) + "[-]"
 }
 
 // applyTheme colours every widget for the current theme.

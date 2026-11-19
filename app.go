@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,9 +44,18 @@ type app struct {
 	themeIdx    int
 	busy        map[string]string // VM name -> action in progress (actStarting, …)
 
+	// How the app calls limactl (loadVMs and limactl); tests swap in fakes.
+	// Set once in newApp, then only read.
+	listVMs    func() ([]instance, error)
+	runCommand func(args ...string) error
+
 	loadMu      sync.Mutex
 	loading     bool // a reload is running
 	reloadAgain bool // reload once more when it finishes
+
+	// manualSeq counts r presses, so a load can tell whether it started
+	// after the latest one.
+	manualSeq atomic.Uint64
 
 	// suspended is set while a VM shell has the terminal. The event loop is
 	// blocked then, so background refreshes would only pile up.
@@ -71,6 +81,8 @@ func newApp(themes []theme, idx int, notice string) *app {
 		themeIdx:   idx,
 		busy:       map[string]string{},
 		message:    notice,
+		listVMs:    loadVMs,
+		runCommand: limactl,
 	}
 	a.setupUI()
 	a.tv.SetInputCapture(a.handleKey)
@@ -108,14 +120,37 @@ func (a *app) run() error {
 	return a.tv.SetRoot(a.pages, true).Run()
 }
 
+// quit stops the UI, but asks first while limactl commands started from it
+// are still running: they carry on after lima-tui exits, with nobody to see
+// whether they worked.
 func (a *app) quit() {
-	a.tv.Stop()
+	if len(a.busy) == 0 {
+		a.tv.Stop()
+		return
+	}
+	names := make([]string, 0, len(a.busy))
+	for name := range a.busy {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var running []string
+	for _, name := range names {
+		running = append(running, a.busy[name]+" "+name)
+	}
+	what, it := "A VM action is", "It keeps"
+	if len(running) > 1 {
+		what, it = "VM actions are", "They keep"
+	}
+	a.confirm(fmt.Sprintf("%s still running:\n\n%s\n\n%s running in the background if you quit, "+
+		"but you won't see whether it worked. Quit anyway?", what, strings.Join(running, "\n"), it),
+		"Quit", a.tv.Stop)
 }
 
 // manualRefresh is the r key: reload now and say so until it's done.
 func (a *app) manualRefresh() {
 	a.message = ""
 	a.refreshing = true
+	a.manualSeq.Add(1)
 	a.renderStatus()
 	a.refresh()
 }
@@ -150,17 +185,22 @@ func (a *app) loadLoop() {
 
 // load runs `limactl list` and shows the result.
 func (a *app) load() {
-	vms, err := loadVMs()
+	seq := a.manualSeq.Load()
+	vms, err := a.listVMs()
 	a.tv.QueueUpdateDraw(func() {
-		manual := a.refreshing
-		a.refreshing = false
+		// Only a load that started after the last r press answers it. One
+		// already running then shows older data; refresh queued another.
+		manual := a.refreshing && seq == a.manualSeq.Load()
+		if manual {
+			a.refreshing = false
+		}
 		if err != nil {
 			a.setError(err)
 			return
 		}
 		if manual {
 			// A list takes milliseconds, so "Refreshing…" alone would just flicker.
-			a.message = "[green]Refreshed[-]"
+			a.message = colored(a.theme().running, "Refreshed")
 		}
 		a.vms = vms
 		a.lastUpdate = time.Now()
@@ -190,7 +230,7 @@ func (a *app) setMessage(msg string) {
 }
 
 func (a *app) setError(err error) {
-	a.setMessage("[red]" + tview.Escape(err.Error()) + "[-]")
+	a.setMessage(colored(a.theme().stopped, err.Error()))
 }
 
 func (a *app) renderStatus() {

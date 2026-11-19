@@ -157,8 +157,8 @@ func loadThemes(dir string, want skinRef) (themes []theme, idx int, warnings []s
 	if i := themeIndex(themes, want.name); i >= 0 {
 		return themes, i, warnings, nil
 	}
-	return nil, 0, nil, fmt.Errorf("skin %q not found (looked for built-ins dark, light and %s)",
-		want.name, filepath.Join(skinsDir, want.name+".yaml"))
+	return nil, 0, nil, fmt.Errorf("skin %q not found (looked for built-ins dark, light and %s.yaml or .yml)",
+		want.name, filepath.Join(skinsDir, want.name))
 }
 
 func isSkinFile(name string) bool {
