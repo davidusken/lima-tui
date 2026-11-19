@@ -127,7 +127,7 @@ starts a YAML comment. Unknown keys or colours are reported at startup.
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## License
 

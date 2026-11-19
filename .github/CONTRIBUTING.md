@@ -34,9 +34,10 @@ make build    # build ./lima-tui
    make lint    # golangci-lint, if you have it installed
    ```
 4. Try your change against real Lima VMs (start/stop/connect, both built-in themes and a skin with `bg: default` if you touched the UI).
-5. Key bindings live in one table, `bindings` in `keys.go`; the key handler, help
-   panel, header and status bar are built from it. Also update the table in
-   `README.md` (`TestReadmeListsEveryKey` fails if a key is missing there).
+5. Key bindings live in one table, `bindings` in `internal/app/keys.go`; the key
+   handler, help panel, header and status bar are built from it. Also update the
+   table in [`README.md`](../README.md) (`TestReadmeListsEveryKey` fails if a key
+   is missing there).
 6. Open the PR with a short description of what changed and why. Screenshots help for UI changes.
 
 CI checks gofmt and runs vet, tests and golangci-lint on macOS and Linux for every PR.
@@ -49,18 +50,23 @@ Commits starting with `docs:`, `chore:` or `test:` are left out of release notes
 
 ## Code layout
 
-| File | What's in it |
+`main.go` only reads flags and config and starts the UI; the rest lives in
+packages under `internal/`, which other modules can't import:
+
+| Path | What's in it |
 |---|---|
-| `main.go` | Flags and startup |
-| `app.go` | App state, background refresh, status bar |
-| `keys.go` | The key binding table and the key handler |
-| `actions.go` | Connect, start/stop, restart, delete |
-| `ui.go` | Layout, table rendering, help panel |
-| `header.go` | Info block and key hints at the top |
-| `theme.go` | The `theme` struct, built-in dark/light themes, applying a theme |
-| `skin.go` | Parsing YAML skins and loading the theme list |
-| `config.go` | Config folder, `config.yaml`, and resolving `--skin` / `skin:` |
-| `vm.go` | Talking to `limactl` and formatting its output |
+| `main.go` | Flags, version, startup |
+| `internal/lima/` | Running `limactl` and parsing its output and errors. No UI code. |
+| `internal/theme/` | The `Theme` struct and built-in dark/light themes (`theme.go`), YAML skins and the theme list (`skin.go`), the config folder, `config.yaml` and resolving `--skin` / `skin:` (`config.go`) |
+| `internal/app/` | The UI: |
+| &nbsp;&nbsp;`app.go` | App state, background refresh, status bar |
+| &nbsp;&nbsp;`keys.go` | The key binding table and the key handler |
+| &nbsp;&nbsp;`actions.go` | Connect, start/stop, restart, delete, confirm dialogs |
+| &nbsp;&nbsp;`ui.go` | Layout, table rendering, help panel |
+| &nbsp;&nbsp;`header.go` | Info block and key hints at the top |
+| &nbsp;&nbsp;`theme.go` | Applying a theme to the widgets, status colours |
+| &nbsp;&nbsp;`format.go` | Formatting VM fields (sizes, paths, SSH) for the table |
+| `skins/` | Example skins |
 | `assets/` | README screenshots and demo GIFs; `assets/demo/` records them |
 
 All `limactl` calls run off the UI goroutine; UI state is only changed inside
@@ -68,8 +74,8 @@ All `limactl` calls run off the UI goroutine; UI state is only changed inside
 
 Tests never run the real `limactl`: the app calls it through its `listVMs` and
 `runCommand` fields, which `newTestApp` replaces with fakes. For code that
-reports back through `QueueUpdateDraw`, `loop_test.go` runs the real event loop
-on a simulated screen (`startLoop`, `onLoop`, `eventually`).
+reports back through `QueueUpdateDraw`, `internal/app/loop_test.go` runs the
+real event loop on a simulated screen (`startLoop`, `onLoop`, `eventually`).
 
 ## Screenshots and demo GIFs
 
@@ -81,9 +87,10 @@ nor shown.
 
 ## Adding a colour or a skin
 
-- A new themeable colour goes in three places: the `theme` struct and both
-  built-ins in `theme.go`, `skinFile` plus the `fields` table in `parseSkin`
-  (`skin.go`), and the skin key list in `README.md`.
+- A new themeable colour goes in three places, all but the last in
+  `internal/theme/`: the `Theme` struct and both built-ins in `theme.go`,
+  `skinFile` plus the `fields` table in `parseSkin` (`skin.go`), and the skin key
+  list in [`README.md`](../README.md).
 - Example skins live in `skins/`. `TestExampleSkins` loads every one of them, so
   a typo fails `make check`. Name the palette's source in a comment at the top,
   and stick to palettes whose licence lets us ship them.
@@ -96,4 +103,4 @@ version in your PR.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contributions are licensed under the [MIT License](../LICENSE).
