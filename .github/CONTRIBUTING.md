@@ -46,7 +46,7 @@ CI checks gofmt and runs vet, tests and golangci-lint on macOS and Linux for eve
 
 Short, imperative summaries are preferred, optionally with a prefix:
 `fix: handle VMs with no IP`, `feat: add filter by status`, `docs: …`, `chore: …`.
-Commits starting with `docs:`, `chore:` or `test:` are left out of release notes.
+Commits starting with `test:` are left out of release notes.
 
 ## Code layout
 

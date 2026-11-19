@@ -32,9 +32,7 @@ changelog:
   sort: asc
   filters:
     exclude:
-      - "^docs?:"
       - "^test:"
-      - "^chore:"
 
 homebrew_casks:
   - name: lima-tui
