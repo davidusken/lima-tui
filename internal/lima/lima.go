@@ -1,4 +1,5 @@
-package main
+// Package lima runs limactl and reads what it prints.
+package lima
 
 import (
 	"bytes"
@@ -8,13 +9,12 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
-// instance is one Lima VM as reported by `limactl list --format json`.
-type instance struct {
+// Instance is one Lima VM as reported by `limactl list --format json`.
+type Instance struct {
 	Name         string `json:"name"`
 	Status       string `json:"status"`
 	SSHAddress   string `json:"sshAddress"`
@@ -28,18 +28,18 @@ type instance struct {
 }
 
 // Statuses limactl reports that lima-tui acts on. (Lima has no in-between
-// states like "Starting"; those are lima-tui's own, see actions.go.)
+// states like "Starting"; those are lima-tui's own, see internal/app.)
 const (
-	statusRunning = "Running"
-	statusStopped = "Stopped"
+	StatusRunning = "Running"
+	StatusStopped = "Stopped"
 )
 
 // queryTimeout bounds `limactl list` and `limactl --version`. Only one list
 // runs at a time, so a hung one would otherwise stop all refreshes.
 const queryTimeout = 30 * time.Second
 
-// loadVMs returns all Lima instances.
-func loadVMs() ([]instance, error) {
+// List returns all Lima instances.
+func List() ([]Instance, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 	defer cancel()
 	var stderr bytes.Buffer
@@ -56,11 +56,11 @@ func loadVMs() ([]instance, error) {
 }
 
 // parseVMs decodes the stream of JSON objects (one per line) that limactl prints.
-func parseVMs(r io.Reader) ([]instance, error) {
+func parseVMs(r io.Reader) ([]Instance, error) {
 	dec := json.NewDecoder(r)
-	var vms []instance
+	var vms []Instance
 	for {
-		var vm instance
+		var vm Instance
 		err := dec.Decode(&vm)
 		if errors.Is(err, io.EOF) {
 			return vms, nil
@@ -78,8 +78,8 @@ func limactlArgs(args ...string) []string {
 	return append([]string{"--log-format", "json"}, args...)
 }
 
-// limactl runs `limactl <args>` and returns a readable error on failure.
-func limactl(args ...string) error {
+// Run runs `limactl <args>` and returns a readable error on failure.
+func Run(args ...string) error {
 	var stderr bytes.Buffer
 	cmd := exec.Command("limactl", limactlArgs(args...)...)
 	cmd.Stderr = &stderr
@@ -126,50 +126,9 @@ func lastLine(b []byte) string {
 	return strings.TrimSpace(lines[len(lines)-1])
 }
 
-// humanBytes formats a byte count the same way `limactl list` does (e.g. 4GiB, 512MiB).
-func humanBytes(n int64) string {
-	const (
-		mib = 1 << 20
-		gib = 1 << 30
-	)
-	switch {
-	case n >= gib && n%gib == 0:
-		return fmt.Sprintf("%dGiB", n/gib)
-	case n >= gib:
-		return fmt.Sprintf("%.1fGiB", float64(n)/gib)
-	default:
-		return fmt.Sprintf("%dMiB", n/mib)
-	}
-}
-
-// shortenHome replaces the user's home directory prefix with ~.
-func shortenHome(path, home string) string {
-	if home == "" {
-		return path
-	}
-	if path == home {
-		return "~"
-	}
-	if strings.HasPrefix(path, home+string(filepath.Separator)) {
-		return "~" + path[len(home):]
-	}
-	return path
-}
-
-// sshEndpoint is what the SSH column shows: just the port for localhost, host:port otherwise.
-func (v instance) sshEndpoint() string {
-	if v.SSHLocalPort == 0 {
-		return "-"
-	}
-	if v.SSHAddress == "" || v.SSHAddress == "127.0.0.1" {
-		return fmt.Sprint(v.SSHLocalPort)
-	}
-	return fmt.Sprintf("%s:%d", v.SSHAddress, v.SSHLocalPort)
-}
-
-// queryLimaVersion returns the installed Lima version (e.g. "2.3.0"), or "" if it
+// Version returns the installed Lima version (e.g. "2.3.0"), or "" if it
 // can't be determined.
-func queryLimaVersion() string {
+func Version() string {
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "limactl", "--version").Output()

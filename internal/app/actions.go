@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	"os/exec"
 
 	"github.com/rivo/tview"
+
+	"github.com/davidusken/lima-tui/internal/lima"
 )
 
 // Actions lima-tui runs on a VM. While one runs, the VM's status cell shows
@@ -24,7 +26,7 @@ func (a *app) connect() {
 	if !ok {
 		return
 	}
-	if vm.Status != statusRunning {
+	if vm.Status != lima.StatusRunning {
 		a.setMessage(fmt.Sprintf("%s is %s; press Ctrl+S to start it first", vm.Name, vm.Status))
 		return
 	}
@@ -52,9 +54,9 @@ func (a *app) toggleRunning() {
 		return
 	}
 	switch vm.Status {
-	case statusRunning:
+	case lima.StatusRunning:
 		a.runLimactl(vm.Name, actStopping, "Stopped", "stop", vm.Name)
-	case statusStopped:
+	case lima.StatusStopped:
 		a.runLimactl(vm.Name, actStarting, "Started", "start", vm.Name)
 	default:
 		a.setMessage(fmt.Sprintf("%s is %s; only running or stopped VMs can be started/stopped", vm.Name, vm.Status))
@@ -66,7 +68,7 @@ func (a *app) restart() {
 	if !ok {
 		return
 	}
-	if vm.Status != statusRunning {
+	if vm.Status != lima.StatusRunning {
 		a.setMessage(fmt.Sprintf("%s is %s; only running VMs can be restarted", vm.Name, vm.Status))
 		return
 	}
@@ -83,7 +85,7 @@ func (a *app) confirmDelete() {
 	}
 
 	text := fmt.Sprintf("Delete VM %q?\n\nIts disk and configuration will be removed. This cannot be undone.", vm.Name)
-	if vm.Status == statusRunning {
+	if vm.Status == lima.StatusRunning {
 		text += "\n\nThe VM is running and will be shut down without a clean stop."
 	}
 
@@ -104,10 +106,10 @@ func (a *app) confirm(text, ok string, onOK func()) {
 	modal := tview.NewModal().
 		SetText(text).
 		AddButtons([]string{"Cancel", ok}).
-		SetBackgroundColor(t.bg).
-		SetTextColor(t.fg).
-		SetButtonBackgroundColor(t.buttonBg).
-		SetButtonTextColor(t.buttonFg).
+		SetBackgroundColor(t.BG).
+		SetTextColor(t.FG).
+		SetButtonBackgroundColor(t.ButtonBG).
+		SetButtonTextColor(t.ButtonFG).
 		SetDoneFunc(func(_ int, label string) {
 			a.pages.RemovePage(pageConfirm)
 			a.tv.SetFocus(a.table)
@@ -121,14 +123,14 @@ func (a *app) confirm(text, ok string, onOK func()) {
 // selectedIdleVM is selectedVM, but refuses (with a message) a VM that already
 // has a limactl command running from this UI. The VM list can lag behind by a
 // refresh, so its status alone doesn't stop a second start/stop/delete.
-func (a *app) selectedIdleVM() (instance, bool) {
+func (a *app) selectedIdleVM() (lima.Instance, bool) {
 	vm, ok := a.selectedVM()
 	if !ok {
-		return instance{}, false
+		return lima.Instance{}, false
 	}
 	if act := a.busy[vm.Name]; act != "" {
 		a.setMessage(fmt.Sprintf("%s is busy (%s); wait for it to finish", vm.Name, act))
-		return instance{}, false
+		return lima.Instance{}, false
 	}
 	return vm, true
 }
@@ -139,7 +141,7 @@ func (a *app) selectedIdleVM() (instance, bool) {
 // event loop.
 func (a *app) runLimactl(name, act, done string, args ...string) {
 	a.busy[name] = act
-	a.setMessage(colored(a.theme().statusColor(act), act+" "+name+"…"))
+	a.setMessage(colored(statusColor(a.theme(), act), act+" "+name+"…"))
 	a.renderTable()
 	go func() {
 		err := a.runCommand(args...)
@@ -149,7 +151,7 @@ func (a *app) runLimactl(name, act, done string, args ...string) {
 			if err != nil {
 				a.setError(err)
 			} else {
-				a.setMessage(colored(a.theme().running, done+" "+name))
+				a.setMessage(colored(a.theme().Running, done+" "+name))
 			}
 		})
 		a.refresh()

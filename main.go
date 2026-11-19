@@ -8,7 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
-	"strings"
+
+	"github.com/davidusken/lima-tui/internal/app"
+	"github.com/davidusken/lima-tui/internal/theme"
 )
 
 // Set at build time by GoReleaser via -ldflags. Other builds fill them in
@@ -49,7 +51,7 @@ func versionFromBuildInfo(info *debug.BuildInfo, version, commit, date string) (
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	skin := flag.String("skin", "", "theme to start with: dark, light, a skin name from "+
-		filepath.Join(configDir(), "skins")+", or a path to a skin file")
+		filepath.Join(theme.ConfigDir(), "skins")+", or a path to a skin file")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage: lima-tui [--skin name] [--version]\n\n"+
 			"A terminal UI for Lima VMs. Press ? inside the app for key bindings.\n\n")
@@ -67,25 +69,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	dir := configDir()
-	cfg, err := loadConfig(dir)
+	dir := theme.ConfigDir()
+	cfg, err := theme.LoadConfig(dir)
 	if err != nil {
 		fail(err)
 	}
-	want := configSkin(dir, cfg.Skin) // --skin wins over config.yaml
+	want := theme.ConfigSkin(dir, cfg.Skin) // --skin wins over config.yaml
 	if *skin != "" {
-		want = flagSkin(dir, *skin)
+		want = theme.FlagSkin(dir, *skin)
 	}
-	themes, idx, warnings, err := loadThemes(dir, want)
+	themes, idx, warnings, err := theme.Load(dir, want)
 	if err != nil {
 		fail(err)
-	}
-	var notice string
-	if len(warnings) > 0 {
-		notice = colored(themes[idx].stopped, strings.Join(warnings, "; "))
 	}
 
-	if err := newApp(themes, idx, notice).run(); err != nil {
+	opts := app.Options{Themes: themes, Theme: idx, Warnings: warnings, Version: version}
+	if err := app.Run(opts); err != nil {
 		fail(err)
 	}
 }

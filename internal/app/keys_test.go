@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
+
+	"github.com/davidusken/lima-tui/internal/lima"
 )
 
 func TestBindingsDontOverlap(t *testing.T) {
@@ -38,7 +40,7 @@ func TestBindingsAreComplete(t *testing.T) {
 
 // README.md keeps its own key table; every key must be in it.
 func TestReadmeListsEveryKey(t *testing.T) {
-	readme, err := os.ReadFile("README.md")
+	readme, err := os.ReadFile("../../README.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +71,7 @@ func TestHandleKeyRunsBinding(t *testing.T) {
 // VM-changing actions need Ctrl; the plain letter does nothing.
 func TestVMActionsNeedCtrl(t *testing.T) {
 	a := newTestApp()
-	a.vms = []instance{{Name: "vm1", Status: statusRunning}}
+	a.vms = []lima.Instance{{Name: "vm1", Status: lima.StatusRunning}}
 	a.renderTable()
 
 	a.handleKey(tcell.NewEventKey(tcell.KeyRune, 'd', tcell.ModNone))

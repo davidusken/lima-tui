@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+
+	"github.com/davidusken/lima-tui/internal/theme"
 )
 
 var columns = []string{"NAME", "STATUS", "SSH", "TYPE", "ARCH", "CPUS", "MEMORY", "DISK", "DIR"}
@@ -85,8 +87,8 @@ func (a *app) renderTable() {
 	a.table.Clear()
 	for col, name := range columns {
 		a.table.SetCell(0, col, tview.NewTableCell(name).
-			SetTextColor(t.headerFg).
-			SetBackgroundColor(t.headerBg).
+			SetTextColor(t.HeaderFG).
+			SetBackgroundColor(t.HeaderBG).
 			SetAttributes(tcell.AttrBold).
 			SetSelectable(false).
 			SetExpansion(1))
@@ -95,7 +97,7 @@ func (a *app) renderTable() {
 	if len(a.vms) == 0 {
 		if !a.lastUpdate.IsZero() {
 			a.table.SetCell(1, 0, tview.NewTableCell("No VMs found. Create one with: limactl start").
-				SetTextColor(t.dim).SetSelectable(false))
+				SetTextColor(t.Dim).SetSelectable(false))
 		}
 		return
 	}
@@ -113,7 +115,7 @@ func (a *app) renderTable() {
 		cells := []string{
 			vm.Name,
 			status,
-			vm.sshEndpoint(),
+			sshEndpoint(vm),
 			vm.VMType,
 			vm.Arch,
 			fmt.Sprint(vm.CPUs),
@@ -124,9 +126,9 @@ func (a *app) renderTable() {
 			tview.Escape(shortenHome(vm.Dir, a.home)),
 		}
 		for col, text := range cells {
-			color := t.fg
+			color := t.FG
 			if col == 1 {
-				color = t.statusColor(status)
+				color = statusColor(t, status)
 				if status != vm.Status {
 					text += "…"
 				}
@@ -137,7 +139,7 @@ func (a *app) renderTable() {
 	a.table.Select(selectRow, 0)
 }
 
-func helpText(t theme) string {
+func helpText(t theme.Theme) string {
 	var b strings.Builder
 	for _, k := range bindings {
 		if k.section != "" {
@@ -149,7 +151,7 @@ func helpText(t theme) string {
 		fmt.Fprintf(&b, "  %-10s %s\n", tview.Escape(k.helpLabel()), k.desc)
 	}
 	fmt.Fprintf(&b, "\n[::b]Status[::-]\n  [%s]Running[-]  [%s]Stopped[-]\n  [%s]Starting[-] [%s]Stopping[-]\n",
-		colorTag(t.running), colorTag(t.stopped), colorTag(t.starting), colorTag(t.stopping))
+		colorTag(t.Running), colorTag(t.Stopped), colorTag(t.Starting), colorTag(t.Stopping))
 	fmt.Fprintf(&b, "\nRefreshes every %s.", refreshInterval)
 	return b.String()
 }

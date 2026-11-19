@@ -1,9 +1,11 @@
-package main
+package app
 
 import (
 	"fmt"
 
 	"github.com/rivo/tview"
+
+	"github.com/davidusken/lima-tui/internal/lima"
 )
 
 const (
@@ -18,25 +20,25 @@ func (a *app) renderHeader() {
 
 	running := 0
 	for _, vm := range a.vms {
-		if vm.Status == statusRunning {
+		if vm.Status == lima.StatusRunning {
 			running++
 		}
 	}
-	lima := a.limaVersion
-	if lima == "" {
-		lima = "…"
+	limaVer := a.limaVersion
+	if limaVer == "" {
+		limaVer = "…"
 	}
 	info := []struct{ label, value string }{
-		{"lima-tui", version},
-		{"Lima", lima},
+		{"lima-tui", a.version},
+		{"Lima", limaVer},
 		{"VMs", fmt.Sprintf("%d running / %d", running, len(a.vms))},
-		{"Theme", tview.Escape(t.name)}, // skin names come from file names
+		{"Theme", tview.Escape(t.Name)}, // skin names come from file names
 	}
 
 	a.headerInfo.Clear()
 	for row, kv := range info {
-		a.headerInfo.SetCell(row, 0, tview.NewTableCell(kv.label+":").SetTextColor(t.title))
-		a.headerInfo.SetCell(row, 1, tview.NewTableCell(kv.value).SetTextColor(t.fg))
+		a.headerInfo.SetCell(row, 0, tview.NewTableCell(kv.label+":").SetTextColor(t.Title))
+		a.headerInfo.SetCell(row, 1, tview.NewTableCell(kv.value).SetTextColor(t.FG))
 	}
 
 	a.headerKeys.Clear()
@@ -46,10 +48,10 @@ func (a *app) renderHeader() {
 			continue
 		}
 		row, col := i%headerRows, (i/headerRows)*2
-		a.headerKeys.SetCell(row, col, tview.NewTableCell(tview.Escape("<"+b.hintKey()+">")).SetTextColor(t.title))
+		a.headerKeys.SetCell(row, col, tview.NewTableCell(tview.Escape("<"+b.hintKey()+">")).SetTextColor(t.Title))
 		// Wide gap after each column so a description isn't read as belonging
 		// to the next column's key.
-		a.headerKeys.SetCell(row, col+1, tview.NewTableCell(b.hint+headerColumnGap).SetTextColor(t.dim))
+		a.headerKeys.SetCell(row, col+1, tview.NewTableCell(b.hint+headerColumnGap).SetTextColor(t.Dim))
 		i++
 	}
 }

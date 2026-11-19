@@ -1,4 +1,4 @@
-package main
+package lima
 
 import (
 	"strings"
@@ -16,10 +16,10 @@ func TestParseVMs(t *testing.T) {
 	if len(vms) != 2 {
 		t.Fatalf("got %d VMs, want 2", len(vms))
 	}
-	if vms[0].Name != "default" || vms[0].Status != statusRunning || vms[0].CPUs != 4 || vms[0].SSHLocalPort != 60022 {
+	if vms[0].Name != "default" || vms[0].Status != StatusRunning || vms[0].CPUs != 4 || vms[0].SSHLocalPort != 60022 {
 		t.Errorf("first VM parsed wrong: %+v", vms[0])
 	}
-	if vms[1].Name != "docker" || vms[1].Status != statusStopped {
+	if vms[1].Name != "docker" || vms[1].Status != StatusStopped {
 		t.Errorf("second VM parsed wrong: %+v", vms[1])
 	}
 }
@@ -37,54 +37,6 @@ func TestParseVMsEmpty(t *testing.T) {
 func TestParseVMsInvalid(t *testing.T) {
 	if _, err := parseVMs(strings.NewReader("{not json")); err == nil {
 		t.Fatal("expected an error for invalid JSON")
-	}
-}
-
-func TestHumanBytes(t *testing.T) {
-	tests := map[int64]string{
-		512 << 20:     "512MiB",
-		4 << 30:       "4GiB",
-		3 << 29:       "1.5GiB",
-		100 << 30:     "100GiB",
-		0:             "0MiB",
-		(1 << 30) - 1: "1023MiB",
-	}
-	for in, want := range tests {
-		if got := humanBytes(in); got != want {
-			t.Errorf("humanBytes(%d) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestShortenHome(t *testing.T) {
-	tests := []struct{ path, home, want string }{
-		{"/Users/me/.lima/default", "/Users/me", "~/.lima/default"},
-		{"/home/me/.lima/default", "/home/me", "~/.lima/default"},
-		{"/Users/me", "/Users/me", "~"},
-		{"/Users/meg/.lima/x", "/Users/me", "/Users/meg/.lima/x"},
-		{"/opt/lima/x", "", "/opt/lima/x"},
-	}
-	for _, tt := range tests {
-		if got := shortenHome(tt.path, tt.home); got != tt.want {
-			t.Errorf("shortenHome(%q, %q) = %q, want %q", tt.path, tt.home, got, tt.want)
-		}
-	}
-}
-
-func TestSSHEndpoint(t *testing.T) {
-	tests := []struct {
-		vm   instance
-		want string
-	}{
-		{instance{SSHLocalPort: 60022}, "60022"},
-		{instance{SSHAddress: "127.0.0.1", SSHLocalPort: 60022}, "60022"},
-		{instance{SSHAddress: "192.168.5.15", SSHLocalPort: 22}, "192.168.5.15:22"},
-		{instance{}, "-"},
-	}
-	for _, tt := range tests {
-		if got := tt.vm.sshEndpoint(); got != tt.want {
-			t.Errorf("sshEndpoint(%+v) = %q, want %q", tt.vm, got, tt.want)
-		}
 	}
 }
 

@@ -1,7 +1,8 @@
-package main
+package app
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -9,6 +10,9 @@ import (
 	"time"
 
 	"github.com/rivo/tview"
+
+	"github.com/davidusken/lima-tui/internal/lima"
+	"github.com/davidusken/lima-tui/internal/theme"
 )
 
 // refreshInterval is how often the VM list is reloaded in the background.
@@ -32,21 +36,22 @@ type app struct {
 	headerInfo *tview.Table
 	headerKeys *tview.Table
 
-	vms         []instance
+	vms         []lima.Instance
 	lastUpdate  time.Time
 	message     string
 	refreshing  bool // a reload the user asked for is running
 	showHelp    bool
 	showHeader  bool
+	version     string // lima-tui's
 	limaVersion string
 	home        string
-	themes      []theme
+	themes      []theme.Theme
 	themeIdx    int
 	busy        map[string]string // VM name -> action in progress (actStarting, …)
 
-	// How the app calls limactl (loadVMs and limactl); tests swap in fakes.
+	// How the app calls limactl (lima.List and lima.Run); tests swap in fakes.
 	// Set once in newApp, then only read.
-	listVMs    func() ([]instance, error)
+	listVMs    func() ([]lima.Instance, error)
 	runCommand func(args ...string) error
 
 	loadMu      sync.Mutex
@@ -62,10 +67,29 @@ type app struct {
 	suspended atomic.Bool
 }
 
-// newApp builds the UI. themes must not be empty; idx is the theme to start
-// with and notice, if set, is shown in the status bar.
-func newApp(themes []theme, idx int, notice string) *app {
+// Options is what lima-tui starts with.
+type Options struct {
+	Themes   []theme.Theme // must not be empty
+	Theme    int           // index in Themes of the theme to start with
+	Warnings []string      // shown in the status bar, e.g. skins that didn't load
+	Version  string        // lima-tui's own version, for the header
+}
+
+// Run shows the UI until the user quits.
+func Run(opts Options) error {
+	return newApp(opts).run()
+}
+
+// newApp builds the UI.
+func newApp(opts Options) *app {
+	// Empty if unknown; shortenHome then leaves paths alone.
+	home, _ := os.UserHomeDir()
+	var notice string
+	if len(opts.Warnings) > 0 {
+		notice = colored(opts.Themes[opts.Theme].Stopped, strings.Join(opts.Warnings, "; "))
+	}
 	a := &app{
+		version:    opts.Version,
 		tv:         tview.NewApplication(),
 		pages:      tview.NewPages(),
 		root:       tview.NewFlex(),
@@ -76,13 +100,13 @@ func newApp(themes []theme, idx int, notice string) *app {
 		headerInfo: tview.NewTable(),
 		headerKeys: tview.NewTable(),
 		showHeader: true,
-		home:       userHome(),
-		themes:     themes,
-		themeIdx:   idx,
+		home:       home,
+		themes:     opts.Themes,
+		themeIdx:   opts.Theme,
 		busy:       map[string]string{},
 		message:    notice,
-		listVMs:    loadVMs,
-		runCommand: limactl,
+		listVMs:    lima.List,
+		runCommand: lima.Run,
 	}
 	a.setupUI()
 	a.tv.SetInputCapture(a.handleKey)
@@ -96,7 +120,7 @@ func (a *app) run() error {
 
 	a.refresh()
 	go func() {
-		v := queryLimaVersion()
+		v := lima.Version()
 		a.tv.QueueUpdateDraw(func() {
 			a.limaVersion = v
 			a.renderHeader()
@@ -200,7 +224,7 @@ func (a *app) load() {
 		}
 		if manual {
 			// A list takes milliseconds, so "Refreshing…" alone would just flicker.
-			a.message = colored(a.theme().running, "Refreshed")
+			a.message = colored(a.theme().Running, "Refreshed")
 		}
 		a.vms = vms
 		a.lastUpdate = time.Now()
@@ -209,10 +233,10 @@ func (a *app) load() {
 }
 
 // selectedVM returns a copy of the highlighted VM, or false if none is selected.
-func (a *app) selectedVM() (instance, bool) {
+func (a *app) selectedVM() (lima.Instance, bool) {
 	row, _ := a.table.GetSelection()
 	if row < 1 || row > len(a.vms) {
-		return instance{}, false
+		return lima.Instance{}, false
 	}
 	return a.vms[row-1], true
 }
@@ -230,7 +254,7 @@ func (a *app) setMessage(msg string) {
 }
 
 func (a *app) setError(err error) {
-	a.setMessage(colored(a.theme().stopped, err.Error()))
+	a.setMessage(colored(a.theme().Stopped, err.Error()))
 }
 
 func (a *app) renderStatus() {

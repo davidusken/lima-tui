@@ -1,4 +1,4 @@
-package main
+package theme
 
 import (
 	"bytes"
@@ -51,34 +51,34 @@ func parseColor(s string) (tcell.Color, error) {
 	return tcell.ColorDefault, fmt.Errorf("unknown colour %q (use a name, #rrggbb or default)", s)
 }
 
-// parseSkin builds a theme from skin YAML, starting from darkTheme.
-func parseSkin(name string, data []byte) (theme, error) {
+// parseSkin builds a theme from skin YAML, starting from Dark.
+func parseSkin(name string, data []byte) (Theme, error) {
 	var sf skinFile
 	if err := decodeYAML(bytes.NewReader(data), &sf); err != nil {
-		return theme{}, err
+		return Theme{}, err
 	}
 
-	t := darkTheme
-	t.name = name
+	t := Dark
+	t.Name = name
 	fields := []struct {
 		key string
 		val string
 		dst *tcell.Color
 	}{
-		{"bg", sf.BG, &t.bg},
-		{"fg", sf.FG, &t.fg},
-		{"dim", sf.Dim, &t.dim},
-		{"title", sf.Title, &t.title},
-		{"header.fg", sf.Header.FG, &t.headerFg},
-		{"header.bg", sf.Header.BG, &t.headerBg},
-		{"selected.fg", sf.Selected.FG, &t.selectedFg},
-		{"selected.bg", sf.Selected.BG, &t.selectedBg},
-		{"button.fg", sf.Button.FG, &t.buttonFg},
-		{"button.bg", sf.Button.BG, &t.buttonBg},
-		{"status.running", sf.Status.Running, &t.running},
-		{"status.stopped", sf.Status.Stopped, &t.stopped},
-		{"status.starting", sf.Status.Starting, &t.starting},
-		{"status.stopping", sf.Status.Stopping, &t.stopping},
+		{"bg", sf.BG, &t.BG},
+		{"fg", sf.FG, &t.FG},
+		{"dim", sf.Dim, &t.Dim},
+		{"title", sf.Title, &t.Title},
+		{"header.fg", sf.Header.FG, &t.HeaderFG},
+		{"header.bg", sf.Header.BG, &t.HeaderBG},
+		{"selected.fg", sf.Selected.FG, &t.SelectedFG},
+		{"selected.bg", sf.Selected.BG, &t.SelectedBG},
+		{"button.fg", sf.Button.FG, &t.ButtonFG},
+		{"button.bg", sf.Button.BG, &t.ButtonBG},
+		{"status.running", sf.Status.Running, &t.Running},
+		{"status.stopped", sf.Status.Stopped, &t.Stopped},
+		{"status.starting", sf.Status.Starting, &t.Starting},
+		{"status.stopping", sf.Status.Stopping, &t.Stopping},
 	}
 	for _, f := range fields {
 		if f.val == "" {
@@ -86,7 +86,7 @@ func parseSkin(name string, data []byte) (theme, error) {
 		}
 		c, err := parseColor(f.val)
 		if err != nil {
-			return theme{}, fmt.Errorf("%s: %w", f.key, err)
+			return Theme{}, fmt.Errorf("%s: %w", f.key, err)
 		}
 		*f.dst = c
 	}
@@ -95,10 +95,10 @@ func parseSkin(name string, data []byte) (theme, error) {
 
 // loadSkin reads a skin file; the theme is named after the file. Errors
 // don't include the path, so callers can name the file as they like.
-func loadSkin(path string) (theme, error) {
+func loadSkin(path string) (Theme, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return theme{}, err
+		return Theme{}, err
 	}
 	return parseSkin(skinName(path), data)
 }
@@ -107,13 +107,13 @@ func skinName(path string) string {
 	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 }
 
-// loadThemes returns the built-in themes followed by every skin in
+// Load returns the built-in themes followed by every skin in
 // dir/skins (os.ReadDir sorts them by name), and the index of want.
 //
 // A skin that is asked for but can't be loaded is an error; other broken
 // skins are skipped and reported in warnings.
-func loadThemes(dir string, want skinRef) (themes []theme, idx int, warnings []string, err error) {
-	themes = append(themes, builtinThemes...)
+func Load(dir string, want SkinRef) (themes []Theme, idx int, warnings []string, err error) {
+	themes = append(themes, Builtins()...)
 
 	skinsDir := filepath.Join(dir, "skins")
 	entries, err := os.ReadDir(skinsDir)
@@ -132,8 +132,8 @@ func loadThemes(dir string, want skinRef) (themes []theme, idx int, warnings []s
 		case err != nil:
 			// Shown in the status bar, so keep it short.
 			warnings = append(warnings, fmt.Sprintf("skin %s: %v", e.Name(), err))
-		case themeIndex(themes, t.name) >= 0:
-			warnings = append(warnings, fmt.Sprintf("skin %s: name %q already taken, skipped", e.Name(), t.name))
+		case themeIndex(themes, t.Name) >= 0:
+			warnings = append(warnings, fmt.Sprintf("skin %s: name %q already taken, skipped", e.Name(), t.Name))
 		default:
 			themes = append(themes, t)
 		}
@@ -146,7 +146,7 @@ func loadThemes(dir string, want skinRef) (themes []theme, idx int, warnings []s
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("skin %s: %w", want.path, err)
 		}
-		if i := themeIndex(themes, t.name); i >= 0 {
+		if i := themeIndex(themes, t.Name); i >= 0 {
 			themes[i] = t
 			return themes, i, warnings, nil
 		}
@@ -166,9 +166,9 @@ func isSkinFile(name string) bool {
 	return ext == ".yaml" || ext == ".yml"
 }
 
-func themeIndex(themes []theme, name string) int {
+func themeIndex(themes []Theme, name string) int {
 	for i, t := range themes {
-		if t.name == name {
+		if t.Name == name {
 			return i
 		}
 	}

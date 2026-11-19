@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"errors"
@@ -6,21 +6,24 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
+
+	"github.com/davidusken/lima-tui/internal/lima"
+	"github.com/davidusken/lima-tui/internal/theme"
 )
 
 // newTestApp returns an app whose limactl calls fail, so a test can't run
 // the real limactl by accident. Tests that need them set fakes.
 func newTestApp() *app {
-	a := newApp(builtinThemes, 0, "")
-	a.listVMs = func() ([]instance, error) { return nil, errors.New("listVMs not faked") }
+	a := newApp(Options{Themes: theme.Builtins(), Version: "test"})
+	a.listVMs = func() ([]lima.Instance, error) { return nil, errors.New("listVMs not faked") }
 	a.runCommand = func(...string) error { return errors.New("runCommand not faked") }
 	return a
 }
 
-func vmsNamed(names ...string) []instance {
-	vms := make([]instance, len(names))
+func vmsNamed(names ...string) []lima.Instance {
+	vms := make([]lima.Instance, len(names))
 	for i, n := range names {
-		vms[i] = instance{Name: n, Status: statusStopped}
+		vms[i] = lima.Instance{Name: n, Status: lima.StatusStopped}
 	}
 	return vms
 }
@@ -63,7 +66,7 @@ func TestBusyVMRefusesActions(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := newTestApp()
-			a.vms = []instance{{Name: "vm1", Status: statusRunning}}
+			a.vms = []lima.Instance{{Name: "vm1", Status: lima.StatusRunning}}
 			a.renderTable()
 			a.busy["vm1"] = actStarting
 
@@ -81,7 +84,7 @@ func TestBusyVMRefusesActions(t *testing.T) {
 
 func TestBusyVMShowsAction(t *testing.T) {
 	a := newTestApp()
-	a.vms = []instance{{Name: "vm1", Status: statusStopped}}
+	a.vms = []lima.Instance{{Name: "vm1", Status: lima.StatusStopped}}
 	a.busy["vm1"] = actStarting
 	a.renderTable()
 
@@ -91,8 +94,8 @@ func TestBusyVMShowsAction(t *testing.T) {
 
 	delete(a.busy, "vm1")
 	a.renderTable()
-	if got := a.table.GetCell(1, 1).Text; got != statusStopped {
-		t.Errorf("status cell = %q after the action, want %s", got, statusStopped)
+	if got := a.table.GetCell(1, 1).Text; got != lima.StatusStopped {
+		t.Errorf("status cell = %q after the action, want %s", got, lima.StatusStopped)
 	}
 }
 

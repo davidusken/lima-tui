@@ -1,8 +1,7 @@
-package main
+package app
 
 import (
 	"errors"
-	"runtime/debug"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -10,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+
+	"github.com/davidusken/lima-tui/internal/lima"
 )
 
 // Tests here run the real tview event loop on a simulated screen, for the
@@ -82,14 +83,14 @@ func TestRunLimactlBusyUntilDone(t *testing.T) {
 		return <-release
 	}
 	var lists atomic.Int32
-	a.listVMs = func() ([]instance, error) {
+	a.listVMs = func() ([]lima.Instance, error) {
 		lists.Add(1)
-		return []instance{{Name: "vm1", Status: statusRunning}}, nil
+		return []lima.Instance{{Name: "vm1", Status: lima.StatusRunning}}, nil
 	}
 	startLoop(t, a)
 
 	onLoop(a, func() {
-		a.vms = []instance{{Name: "vm1", Status: statusStopped}}
+		a.vms = []lima.Instance{{Name: "vm1", Status: lima.StatusStopped}}
 		a.runLimactl("vm1", actStarting, "Started", "start", "vm1")
 	})
 	if args := waitFor(t, gotArgs, "limactl to run"); !slices.Equal(args, []string{"start", "vm1"}) {
@@ -107,7 +108,7 @@ func TestRunLimactlBusyUntilDone(t *testing.T) {
 	release <- nil
 	eventually(t, a, "the VM to be idle and the list reloaded", func() bool {
 		return len(a.busy) == 0 && strings.Contains(a.message, "Started vm1") &&
-			len(a.vms) == 1 && a.vms[0].Status == statusRunning
+			len(a.vms) == 1 && a.vms[0].Status == lima.StatusRunning
 	})
 	if lists.Load() == 0 {
 		t.Error("the VM list wasn't reloaded after the action")
@@ -117,7 +118,7 @@ func TestRunLimactlBusyUntilDone(t *testing.T) {
 func TestRunLimactlShowsError(t *testing.T) {
 	a := newTestApp()
 	a.runCommand = func(...string) error { return errors.New("limactl stop: [boom]") }
-	a.listVMs = func() ([]instance, error) { return nil, nil }
+	a.listVMs = func() ([]lima.Instance, error) { return nil, nil }
 	startLoop(t, a)
 
 	onLoop(a, func() { a.runLimactl("vm1", actStopping, "Stopped", "stop", "vm1") })
@@ -129,7 +130,7 @@ func TestRunLimactlShowsError(t *testing.T) {
 
 func TestLoadErrorShown(t *testing.T) {
 	a := newTestApp()
-	a.listVMs = func() ([]instance, error) { return nil, errors.New("limactl list: no answer") }
+	a.listVMs = func() ([]lima.Instance, error) { return nil, errors.New("limactl list: no answer") }
 	startLoop(t, a)
 
 	onLoop(a, a.manualRefresh)
@@ -143,9 +144,9 @@ func TestLoadErrorShown(t *testing.T) {
 func TestManualRefreshWaitsForItsOwnLoad(t *testing.T) {
 	a := newTestApp()
 	started := make(chan int, 10)
-	release := make(chan []instance)
+	release := make(chan []lima.Instance)
 	var calls atomic.Int32
-	a.listVMs = func() ([]instance, error) {
+	a.listVMs = func() ([]lima.Instance, error) {
 		started <- int(calls.Add(1))
 		return <-release, nil
 	}
@@ -250,41 +251,5 @@ func TestQuitDialogListsActions(t *testing.T) {
 		if !strings.Contains(text.String(), want) {
 			t.Errorf("dialog doesn't say %q:%s", want, text.String())
 		}
-	}
-}
-
-func TestVersionFromBuildInfo(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		info debug.BuildInfo
-		want [3]string
-	}{
-		{
-			name: "go install of a tag",
-			info: debug.BuildInfo{Main: debug.Module{Version: "v1.2.0"}},
-			want: [3]string{"v1.2.0", "none", "unknown"},
-		},
-		{
-			name: "local build with VCS stamp",
-			info: debug.BuildInfo{
-				Main: debug.Module{Version: "(devel)"},
-				Settings: []debug.BuildSetting{
-					{Key: "vcs.revision", Value: "aa9b772f00c0ffee"},
-					{Key: "vcs.time", Value: "2026-11-19T08:34:00Z"},
-				},
-			},
-			want: [3]string{"dev", "aa9b772", "2026-11-19T08:34:00Z"},
-		},
-		{
-			name: "nothing known",
-			want: [3]string{"dev", "none", "unknown"},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			v, c, d := versionFromBuildInfo(&tc.info, "dev", "none", "unknown")
-			if got := [3]string{v, c, d}; got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-		})
 	}
 }
