@@ -47,7 +47,7 @@ var (
 	builtinThemes = []theme{darkTheme, lightTheme}
 )
 
-func (a *App) theme() theme {
+func (a *app) theme() theme {
 	return a.themes[a.themeIdx]
 }
 
@@ -78,7 +78,7 @@ func colorTag(c tcell.Color) string {
 }
 
 // applyTheme colours every widget for the current theme.
-func (a *App) applyTheme() {
+func (a *app) applyTheme() {
 	t := a.theme()
 
 	// Defaults for widgets created later (e.g. the delete dialog).
@@ -110,10 +110,9 @@ func (a *App) applyTheme() {
 }
 
 // cycleTheme switches to the next built-in theme or loaded skin.
-func (a *App) cycleTheme() {
+func (a *app) cycleTheme() {
 	a.themeIdx = (a.themeIdx + 1) % len(a.themes)
 	a.applyTheme()
-	a.renderTable()
-	a.renderHeader()
-	a.setMessage("Theme: " + tview.Escape(a.theme().name))
+	a.message = "Theme: " + tview.Escape(a.theme().name)
+	a.render()
 }

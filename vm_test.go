@@ -73,13 +73,13 @@ func TestShortenHome(t *testing.T) {
 
 func TestSSHEndpoint(t *testing.T) {
 	tests := []struct {
-		vm   VM
+		vm   instance
 		want string
 	}{
-		{VM{SSHLocalPort: 60022}, "60022"},
-		{VM{SSHAddress: "127.0.0.1", SSHLocalPort: 60022}, "60022"},
-		{VM{SSHAddress: "192.168.5.15", SSHLocalPort: 22}, "192.168.5.15:22"},
-		{VM{}, "-"},
+		{instance{SSHLocalPort: 60022}, "60022"},
+		{instance{SSHAddress: "127.0.0.1", SSHLocalPort: 60022}, "60022"},
+		{instance{SSHAddress: "192.168.5.15", SSHLocalPort: 22}, "192.168.5.15:22"},
+		{instance{}, "-"},
 	}
 	for _, tt := range tests {
 		if got := tt.vm.sshEndpoint(); got != tt.want {
@@ -113,11 +113,11 @@ func TestParseLimaVersion(t *testing.T) {
 
 func TestLogMessage(t *testing.T) {
 	tests := map[string]string{
-		// Real limactl output.
-		`time="2026-11-19T08:10:26+01:00" level=fatal msg="open /Users/me/.lima/x/lima.yaml: no such file or directory"`: "open /Users/me/.lima/x/lima.yaml: no such file or directory",
-		`time="..." level=fatal msg="failed to stop" error="exit status 1"`:                                              "failed to stop: exit status 1",
-		`level=fatal msg="instance \"x\" not found"`:                                                                     `instance "x" not found`,
-		`level=fatal msg=bare`:  "bare",
+		// Real limactl --log-format json output.
+		`{"level":"fatal","msg":"open /Users/me/.lima/x/lima.yaml: no such file or directory","time":"2026-11-19T09:26:54+01:00"}`: "open /Users/me/.lima/x/lima.yaml: no such file or directory",
+		`{"level":"fatal","msg":"failed to stop","error":"exit status 1"}`:                                                         "failed to stop: exit status 1",
+		`{"level":"fatal","error":"exit status 1"}`:                                                                                "exit status 1",
+		`{"level":"info"}`:      `{"level":"info"}`,
 		"some plain error text": "some plain error text",
 		"":                      "",
 	}

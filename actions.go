@@ -19,17 +19,19 @@ const (
 )
 
 // connect opens `limactl shell` for the selected VM, then returns to the UI.
-func (a *App) connect() {
+func (a *app) connect() {
 	vm, ok := a.selectedVM()
 	if !ok {
 		return
 	}
 	if vm.Status != statusRunning {
-		a.setMessage(fmt.Sprintf("%s is %s; press s to start it first", vm.Name, vm.Status))
+		a.setMessage(fmt.Sprintf("%s is %s; press Ctrl+S to start it first", vm.Name, vm.Status))
 		return
 	}
 
-	a.app.Suspend(func() {
+	a.suspended.Store(true)
+	defer a.suspended.Store(false)
+	a.tv.Suspend(func() {
 		cmd := exec.Command("limactl", "shell", vm.Name)
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 		// A non-zero exit is just the status of the user's last command in
@@ -44,22 +46,22 @@ func (a *App) connect() {
 }
 
 // toggleRunning starts a stopped VM or stops a running one.
-func (a *App) toggleRunning() {
+func (a *app) toggleRunning() {
 	vm, ok := a.selectedIdleVM()
 	if !ok {
 		return
 	}
 	switch vm.Status {
 	case statusRunning:
-		a.runLimactl(vm.Name, actStopping, "Stopped", []string{"stop", vm.Name})
+		a.runLimactl(vm.Name, actStopping, "Stopped", "stop", vm.Name)
 	case statusStopped:
-		a.runLimactl(vm.Name, actStarting, "Started", []string{"start", vm.Name})
+		a.runLimactl(vm.Name, actStarting, "Started", "start", vm.Name)
 	default:
 		a.setMessage(fmt.Sprintf("%s is %s; only running or stopped VMs can be started/stopped", vm.Name, vm.Status))
 	}
 }
 
-func (a *App) restart() {
+func (a *app) restart() {
 	vm, ok := a.selectedIdleVM()
 	if !ok {
 		return
@@ -68,14 +70,13 @@ func (a *App) restart() {
 		a.setMessage(fmt.Sprintf("%s is %s; only running VMs can be restarted", vm.Name, vm.Status))
 		return
 	}
-	a.runLimactl(vm.Name, actRestarting, "Restarted",
-		[]string{"stop", vm.Name}, []string{"start", vm.Name})
+	a.runLimactl(vm.Name, actRestarting, "Restarted", "restart", vm.Name)
 }
 
 // confirmDelete asks before deleting the selected VM. It always uses
 // `limactl delete --force`, so a VM that is running (or was started while
 // the dialog was open) is killed instead of making the delete fail.
-func (a *App) confirmDelete() {
+func (a *app) confirmDelete() {
 	vm, ok := a.selectedIdleVM()
 	if !ok {
 		return
@@ -96,7 +97,7 @@ func (a *App) confirmDelete() {
 		SetButtonTextColor(t.buttonFg).
 		SetDoneFunc(func(_ int, label string) {
 			a.pages.RemovePage(pageConfirm)
-			a.app.SetFocus(a.table)
+			a.tv.SetFocus(a.table)
 			if label != "Delete" {
 				return
 			}
@@ -105,8 +106,7 @@ func (a *App) confirmDelete() {
 				a.setMessage(fmt.Sprintf("%s is busy; not deleted", vm.Name))
 				return
 			}
-			a.runLimactl(vm.Name, actDeleting, "Deleted",
-				[]string{"delete", "--force", vm.Name})
+			a.runLimactl(vm.Name, actDeleting, "Deleted", "delete", "--force", vm.Name)
 		})
 
 	a.pages.AddPage(pageConfirm, modal, false, true)
@@ -115,34 +115,29 @@ func (a *App) confirmDelete() {
 // selectedIdleVM is selectedVM, but refuses (with a message) a VM that already
 // has a limactl command running from this UI. The VM list can lag behind by a
 // refresh, so its status alone doesn't stop a second start/stop/delete.
-func (a *App) selectedIdleVM() (VM, bool) {
+func (a *app) selectedIdleVM() (instance, bool) {
 	vm, ok := a.selectedVM()
 	if !ok {
-		return VM{}, false
+		return instance{}, false
 	}
 	if act := a.busy[vm.Name]; act != "" {
 		a.setMessage(fmt.Sprintf("%s is busy (%s); wait for it to finish", vm.Name, act))
-		return VM{}, false
+		return instance{}, false
 	}
 	return vm, true
 }
 
-// runLimactl runs the given limactl commands for VM name one after another in
-// the background. act (e.g. actStarting) is shown in the VM's status cell and
-// the status bar until they finish, then done ("Started") or the error.
-// Must be called from the event loop.
-func (a *App) runLimactl(name, act, done string, cmds ...[]string) {
+// runLimactl runs `limactl <args>` for VM name in the background. act (e.g.
+// actStarting) is shown in the VM's status cell and the status bar until it
+// finishes, then done ("Started") or the error. Must be called from the
+// event loop.
+func (a *app) runLimactl(name, act, done string, args ...string) {
 	a.busy[name] = act
 	a.setMessage("[yellow]" + tview.Escape(act+" "+name) + "…[-]")
 	a.renderTable()
 	go func() {
-		var err error
-		for _, args := range cmds {
-			if err = limactl(args...); err != nil {
-				break
-			}
-		}
-		a.app.QueueUpdateDraw(func() {
+		err := limactl(args...)
+		a.tv.QueueUpdateDraw(func() {
 			delete(a.busy, name)
 			a.renderTable()
 			if err != nil {

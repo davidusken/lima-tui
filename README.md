@@ -21,7 +21,7 @@ into a shell, without typing `limactl` commands.
 
 ## Installation
 
-Requires [Lima](https://lima-vm.io/docs/installation/) with `limactl` on your `PATH`.
+Requires [Lima](https://lima-vm.io/docs/installation/) 1.1 or newer, with `limactl` on your `PATH`.
 
 **Homebrew** (macOS)
 
@@ -49,15 +49,17 @@ lima-tui
 | `↑`/`↓`, `j`/`k` | Select VM |
 | `g` / `G` | First / last VM |
 | `Enter`, `c` | Open a shell in the VM (`limactl shell`) |
-| `s` | Start or stop the VM |
-| `R` | Restart the VM |
-| `d` | Delete the VM (asks first; a running VM is shut down) |
+| `Ctrl+S` | Start or stop the VM |
+| `Ctrl+R` | Restart the VM (`limactl restart`) |
+| `Ctrl+D` | Delete the VM (asks first; a running VM is shut down) |
 | `r` | Refresh now |
 | `t` | Next theme/skin |
-| `h`, `?` | Toggle the key help panel |
+| `?`, `h` | Toggle the key help panel |
 | `Esc` | Close the help panel |
 | `Ctrl+E` | Hide/show the header with key hints |
 | `q`, `Ctrl+C` | Quit |
+
+Actions that change a VM need Ctrl, so a stray key press can't stop one.
 
 `lima-tui --version` prints the installed version.
 

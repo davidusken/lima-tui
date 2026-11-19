@@ -7,14 +7,14 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-func newTestApp() *App {
-	return NewApp(builtinThemes, 0, "")
+func newTestApp() *app {
+	return newApp(builtinThemes, 0, "")
 }
 
-func vmsNamed(names ...string) []VM {
-	vms := make([]VM, len(names))
+func vmsNamed(names ...string) []instance {
+	vms := make([]instance, len(names))
 	for i, n := range names {
-		vms[i] = VM{Name: n, Status: statusStopped}
+		vms[i] = instance{Name: n, Status: statusStopped}
 	}
 	return vms
 }
@@ -50,14 +50,14 @@ func TestRenderTableSelectionGone(t *testing.T) {
 }
 
 func TestBusyVMRefusesActions(t *testing.T) {
-	for name, action := range map[string]func(*App){
-		"toggleRunning": (*App).toggleRunning,
-		"restart":       (*App).restart,
-		"confirmDelete": (*App).confirmDelete,
+	for name, action := range map[string]func(*app){
+		"toggleRunning": (*app).toggleRunning,
+		"restart":       (*app).restart,
+		"confirmDelete": (*app).confirmDelete,
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := newTestApp()
-			a.vms = []VM{{Name: "vm1", Status: statusRunning}}
+			a.vms = []instance{{Name: "vm1", Status: statusRunning}}
 			a.renderTable()
 			a.busy["vm1"] = actStarting
 
@@ -75,7 +75,7 @@ func TestBusyVMRefusesActions(t *testing.T) {
 
 func TestBusyVMShowsAction(t *testing.T) {
 	a := newTestApp()
-	a.vms = []VM{{Name: "vm1", Status: statusStopped}}
+	a.vms = []instance{{Name: "vm1", Status: statusStopped}}
 	a.busy["vm1"] = actStarting
 	a.renderTable()
 

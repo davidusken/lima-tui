@@ -45,10 +45,11 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if *skin == "" {
-		*skin = configSkin(dir, cfg.Skin)
+	want := configSkin(dir, cfg.Skin) // --skin wins over config.yaml
+	if *skin != "" {
+		want = flagSkin(dir, *skin)
 	}
-	themes, idx, warnings, err := loadThemes(dir, *skin)
+	themes, idx, warnings, err := loadThemes(dir, want)
 	if err != nil {
 		fail(err)
 	}
@@ -57,7 +58,7 @@ func main() {
 		notice = "[red]" + tview.Escape(strings.Join(warnings, "; ")) + "[-]"
 	}
 
-	if err := NewApp(themes, idx, notice).Run(); err != nil {
+	if err := newApp(themes, idx, notice).run(); err != nil {
 		fail(err)
 	}
 }

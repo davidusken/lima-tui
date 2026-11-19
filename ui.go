@@ -10,24 +10,7 @@ import (
 
 var columns = []string{"NAME", "STATUS", "SSH", "TYPE", "ARCH", "CPUS", "MEMORY", "DISK", "DIR"}
 
-// keyHelp is the single list of key bindings, used for the help panel.
-// Keep README.md in sync when changing it.
-var keyHelp = []struct{ section, keys, desc string }{
-	{"Navigate", "↑/↓, j/k", "Select VM"},
-	{"", "g/G", "First/last VM"},
-	{"Actions", "Enter, c", "Open a shell in the VM"},
-	{"", "s", "Start/stop VM"},
-	{"", "R", "Restart VM"},
-	{"", "d", "Delete VM (asks first)"},
-	{"", "r", "Refresh now"},
-	{"View", "t", "Next theme/skin"},
-	{"", "h, ?", "Toggle this help"},
-	{"", "Esc", "Close this help"},
-	{"", "Ctrl+E", "Toggle key header"},
-	{"", "q", "Quit"},
-}
-
-func (a *App) setupUI() {
+func (a *app) setupUI() {
 	a.table.
 		SetSelectable(true, false).
 		SetFixed(1, 0).
@@ -49,13 +32,11 @@ func (a *App) setupUI() {
 
 	a.applyTheme()
 	a.layout()
-	a.renderTable()
-	a.renderHeader()
-	a.renderStatus()
+	a.render()
 }
 
 // layout (re)builds the main page; called when the header or help panel is toggled.
-func (a *App) layout() {
+func (a *app) layout() {
 	body := tview.NewFlex().AddItem(a.table, 0, 1, true)
 	if a.showHelp {
 		body.AddItem(a.helpText, 40, 0, false)
@@ -75,17 +56,24 @@ func (a *App) layout() {
 	}
 }
 
-func (a *App) toggleHelp() {
+func (a *app) toggleHelp() {
 	a.showHelp = !a.showHelp
 	a.layout()
-	a.app.SetFocus(a.table)
+	a.tv.SetFocus(a.table)
+}
+
+// closeHelp is Esc. It never quits, so a stray Esc is harmless.
+func (a *app) closeHelp() {
+	if a.showHelp {
+		a.toggleHelp()
+	}
 }
 
 // renderTable redraws the table from a.vms, keeping the same VM selected.
 // The selected name is read from the table itself, which still shows the
 // previous list: a.vms may already have been replaced, and looking the row up
 // there would select whichever VM now sits at that position.
-func (a *App) renderTable() {
+func (a *app) renderTable() {
 	selected := ""
 	if row, _ := a.table.GetSelection(); row >= 1 {
 		if cell := a.table.GetCell(row, 0); cell != nil {
@@ -151,14 +139,14 @@ func (a *App) renderTable() {
 
 func helpText(t theme) string {
 	var b strings.Builder
-	for _, k := range keyHelp {
+	for _, k := range bindings {
 		if k.section != "" {
 			if b.Len() > 0 {
 				b.WriteString("\n")
 			}
 			fmt.Fprintf(&b, "[::b]%s[::-]\n", k.section)
 		}
-		fmt.Fprintf(&b, "  %-10s %s\n", tview.Escape(k.keys), k.desc)
+		fmt.Fprintf(&b, "  %-10s %s\n", tview.Escape(k.helpLabel()), k.desc)
 	}
 	fmt.Fprintf(&b, "\n[::b]Status[::-]\n  [%s]Running[-]  [%s]Stopped[-]\n  [%s]Starting[-] [%s]Stopping[-]\n",
 		colorTag(t.running), colorTag(t.stopped), colorTag(t.starting), colorTag(t.stopping))

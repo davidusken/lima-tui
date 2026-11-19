@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
@@ -18,10 +18,10 @@ const (
 	pageConfirm = "confirm"
 )
 
-// App holds the UI and the last known VM list. Fields above loadMu are only
+// app holds the UI and the last known VM list. Fields above loadMu are only
 // touched from the tview event loop (directly or via QueueUpdateDraw).
-type App struct {
-	app        *tview.Application
+type app struct {
+	tv         *tview.Application
 	pages      *tview.Pages
 	root       *tview.Flex
 	table      *tview.Table
@@ -31,9 +31,10 @@ type App struct {
 	headerInfo *tview.Table
 	headerKeys *tview.Table
 
-	vms         []VM
+	vms         []instance
 	lastUpdate  time.Time
 	message     string
+	refreshing  bool // a reload the user asked for is running
 	showHelp    bool
 	showHeader  bool
 	limaVersion string
@@ -45,13 +46,17 @@ type App struct {
 	loadMu      sync.Mutex
 	loading     bool // a reload is running
 	reloadAgain bool // reload once more when it finishes
+
+	// suspended is set while a VM shell has the terminal. The event loop is
+	// blocked then, so background refreshes would only pile up.
+	suspended atomic.Bool
 }
 
-// NewApp builds the UI. themes must not be empty; idx is the theme to start
+// newApp builds the UI. themes must not be empty; idx is the theme to start
 // with and notice, if set, is shown in the status bar.
-func NewApp(themes []theme, idx int, notice string) *App {
-	a := &App{
-		app:        tview.NewApplication(),
+func newApp(themes []theme, idx int, notice string) *app {
+	a := &app{
+		tv:         tview.NewApplication(),
 		pages:      tview.NewPages(),
 		root:       tview.NewFlex(),
 		table:      tview.NewTable(),
@@ -68,19 +73,19 @@ func NewApp(themes []theme, idx int, notice string) *App {
 		message:    notice,
 	}
 	a.setupUI()
-	a.app.SetInputCapture(a.handleKey)
+	a.tv.SetInputCapture(a.handleKey)
 	return a
 }
 
-// Run shows the UI until the user quits.
-func (a *App) Run() error {
+// run shows the UI until the user quits.
+func (a *app) run() error {
 	stop := make(chan struct{})
 	defer close(stop)
 
 	a.refresh()
 	go func() {
-		v := LimaVersion()
-		a.app.QueueUpdateDraw(func() {
+		v := queryLimaVersion()
+		a.tv.QueueUpdateDraw(func() {
 			a.limaVersion = v
 			a.renderHeader()
 		})
@@ -91,69 +96,35 @@ func (a *App) Run() error {
 		for {
 			select {
 			case <-ticker.C:
-				a.refresh()
+				if !a.suspended.Load() {
+					a.refresh()
+				}
 			case <-stop:
 				return
 			}
 		}
 	}()
 
-	return a.app.SetRoot(a.pages, true).Run()
+	return a.tv.SetRoot(a.pages, true).Run()
 }
 
-func (a *App) handleKey(event *tcell.EventKey) *tcell.EventKey {
-	// Let the delete dialog handle its own keys.
-	if front, _ := a.pages.GetFrontPage(); front != pageMain {
-		return event
-	}
+func (a *app) quit() {
+	a.tv.Stop()
+}
 
-	switch event.Key() {
-	case tcell.KeyCtrlC:
-		a.app.Stop()
-		return nil
-	case tcell.KeyEsc:
-		// Closes the help panel; never quits, so a stray Esc is harmless.
-		if a.showHelp {
-			a.toggleHelp()
-		}
-		return nil
-	case tcell.KeyCtrlE:
-		a.toggleHeader()
-		return nil
-	case tcell.KeyEnter:
-		a.connect()
-		return nil
-	}
-
-	switch event.Rune() {
-	case 'q':
-		a.app.Stop()
-	case 'h', '?':
-		a.toggleHelp()
-	case 'c':
-		a.connect()
-	case 's':
-		a.toggleRunning()
-	case 'R':
-		a.restart()
-	case 'd':
-		a.confirmDelete()
-	case 'r':
-		a.setMessage("Refreshing…")
-		a.refresh()
-	case 't':
-		a.cycleTheme()
-	default:
-		return event // navigation keys go to the table
-	}
-	return nil
+// manualRefresh is the r key: reload now and say so until it's done.
+func (a *app) manualRefresh() {
+	a.message = ""
+	a.refreshing = true
+	a.renderStatus()
+	a.refresh()
 }
 
 // refresh reloads the VM list in the background. A call made while a reload
 // is running queues one more reload after it, so a change that lands
 // mid-reload (e.g. a finished `limactl start`) isn't missed until the next
 // tick. Safe to call from any goroutine.
-func (a *App) refresh() {
+func (a *app) refresh() {
 	a.loadMu.Lock()
 	defer a.loadMu.Unlock()
 	if a.loading {
@@ -164,7 +135,7 @@ func (a *App) refresh() {
 	go a.loadLoop()
 }
 
-func (a *App) loadLoop() {
+func (a *app) loadLoop() {
 	for {
 		a.load()
 		a.loadMu.Lock()
@@ -178,44 +149,55 @@ func (a *App) loadLoop() {
 }
 
 // load runs `limactl list` and shows the result.
-func (a *App) load() {
-	vms, err := LoadVMs()
-	a.app.QueueUpdateDraw(func() {
+func (a *app) load() {
+	vms, err := loadVMs()
+	a.tv.QueueUpdateDraw(func() {
+		manual := a.refreshing
+		a.refreshing = false
 		if err != nil {
 			a.setError(err)
 			return
 		}
-		if a.message == "Refreshing…" {
-			a.message = ""
+		if manual {
+			// A list takes milliseconds, so "Refreshing…" alone would just flicker.
+			a.message = "[green]Refreshed[-]"
 		}
 		a.vms = vms
 		a.lastUpdate = time.Now()
-		a.renderTable()
-		a.renderHeader()
-		a.renderStatus()
+		a.render()
 	})
 }
 
 // selectedVM returns a copy of the highlighted VM, or false if none is selected.
-func (a *App) selectedVM() (VM, bool) {
+func (a *app) selectedVM() (instance, bool) {
 	row, _ := a.table.GetSelection()
 	if row < 1 || row > len(a.vms) {
-		return VM{}, false
+		return instance{}, false
 	}
 	return a.vms[row-1], true
 }
 
-func (a *App) setMessage(msg string) {
+// render redraws everything that shows app state.
+func (a *app) render() {
+	a.renderTable()
+	a.renderHeader()
+	a.renderStatus()
+}
+
+func (a *app) setMessage(msg string) {
 	a.message = msg
 	a.renderStatus()
 }
 
-func (a *App) setError(err error) {
+func (a *app) setError(err error) {
 	a.setMessage("[red]" + tview.Escape(err.Error()) + "[-]")
 }
 
-func (a *App) renderStatus() {
+func (a *app) renderStatus() {
 	var parts []string
+	if a.refreshing {
+		parts = append(parts, "Refreshing…")
+	}
 	if a.message != "" {
 		parts = append(parts, a.message)
 	}
@@ -223,7 +205,7 @@ func (a *App) renderStatus() {
 		parts = append(parts, fmt.Sprintf("%d VMs, updated %s", len(a.vms), a.lastUpdate.Format("15:04:05")))
 	}
 	if !a.showHeader {
-		parts = append(parts, "?: help  ctrl-e: header  q: quit")
+		parts = append(parts, statusHints())
 	}
 	a.statusBar.SetText(" " + strings.Join(parts, "  │  "))
 }

@@ -7,16 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
 
-// VM is one Lima instance as reported by `limactl list --format json`.
-type VM struct {
+// instance is one Lima VM as reported by `limactl list --format json`.
+type instance struct {
 	Name         string `json:"name"`
 	Status       string `json:"status"`
 	SSHAddress   string `json:"sshAddress"`
@@ -40,12 +38,12 @@ const (
 // runs at a time, so a hung one would otherwise stop all refreshes.
 const queryTimeout = 30 * time.Second
 
-// LoadVMs returns all Lima instances.
-func LoadVMs() ([]VM, error) {
+// loadVMs returns all Lima instances.
+func loadVMs() ([]instance, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 	defer cancel()
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, "limactl", "list", "--format", "json")
+	cmd := exec.CommandContext(ctx, "limactl", limactlArgs("list", "--format", "json")...)
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if ctx.Err() != nil {
@@ -58,11 +56,11 @@ func LoadVMs() ([]VM, error) {
 }
 
 // parseVMs decodes the stream of JSON objects (one per line) that limactl prints.
-func parseVMs(r io.Reader) ([]VM, error) {
+func parseVMs(r io.Reader) ([]instance, error) {
 	dec := json.NewDecoder(r)
-	var vms []VM
+	var vms []instance
 	for {
-		var vm VM
+		var vm instance
 		err := dec.Decode(&vm)
 		if errors.Is(err, io.EOF) {
 			return vms, nil
@@ -74,10 +72,16 @@ func parseVMs(r io.Reader) ([]VM, error) {
 	}
 }
 
+// limactlArgs puts the global flags lima-tui always passes in front of args.
+// JSON logs make the error on stderr easy to pick out (see logMessage).
+func limactlArgs(args ...string) []string {
+	return append([]string{"--log-format", "json"}, args...)
+}
+
 // limactl runs `limactl <args>` and returns a readable error on failure.
 func limactl(args ...string) error {
 	var stderr bytes.Buffer
-	cmd := exec.Command("limactl", args...)
+	cmd := exec.Command("limactl", limactlArgs(args...)...)
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		return limactlError(args[0], err, stderr.Bytes())
@@ -95,49 +99,24 @@ func limactlError(subcmd string, err error, stderr []byte) error {
 	return fmt.Errorf("limactl %s: %w", subcmd, err)
 }
 
-// logMessage pulls the msg and error fields out of a logrus text line
-// (`time="…" level=fatal msg="…" error="…"`), as "msg: error". A line that
-// has neither field is returned unchanged.
+// logMessage pulls the msg and error fields out of a limactl JSON log line
+// (`{"level":"fatal","msg":"…","error":"…"}`), as "msg: error". Anything
+// else, such as output from a command limactl ran, is returned unchanged.
 func logMessage(line string) string {
-	fields := logfmtFields(line)
-	msg, errText := fields["msg"], fields["error"]
+	var entry struct{ Msg, Error string }
+	if json.Unmarshal([]byte(line), &entry) != nil {
+		return line
+	}
 	switch {
-	case msg != "" && errText != "":
-		return msg + ": " + errText
-	case msg != "":
-		return msg
-	case errText != "":
-		return errText
+	case entry.Msg != "" && entry.Error != "":
+		return entry.Msg + ": " + entry.Error
+	case entry.Msg != "":
+		return entry.Msg
+	case entry.Error != "":
+		return entry.Error
 	default:
 		return line
 	}
-}
-
-// logfmtFields parses key=value pairs, where a value is either bare or a
-// Go-quoted string. Parsing stops at the first thing that doesn't fit.
-func logfmtFields(line string) map[string]string {
-	fields := map[string]string{}
-	rest := strings.TrimSpace(line)
-	for rest != "" {
-		key, after, ok := strings.Cut(rest, "=")
-		if !ok || key == "" || strings.ContainsAny(key, " \"") {
-			break
-		}
-		var val string
-		if strings.HasPrefix(after, `"`) {
-			quoted, err := strconv.QuotedPrefix(after)
-			if err != nil {
-				break
-			}
-			val, _ = strconv.Unquote(quoted) // QuotedPrefix guarantees it's valid
-			after = after[len(quoted):]
-		} else {
-			val, after, _ = strings.Cut(after, " ")
-		}
-		fields[key] = val
-		rest = strings.TrimLeft(after, " ")
-	}
-	return fields
 }
 
 // lastLine returns the last non-empty line of b, which is where limactl
@@ -177,13 +156,8 @@ func shortenHome(path, home string) string {
 	return path
 }
 
-func userHome() string {
-	home, _ := os.UserHomeDir() // empty on error; shortenHome then leaves paths alone
-	return home
-}
-
 // sshEndpoint is what the Port column shows: just the port for localhost, host:port otherwise.
-func (v VM) sshEndpoint() string {
+func (v instance) sshEndpoint() string {
 	if v.SSHLocalPort == 0 {
 		return "-"
 	}
@@ -193,9 +167,9 @@ func (v VM) sshEndpoint() string {
 	return fmt.Sprintf("%s:%d", v.SSHAddress, v.SSHLocalPort)
 }
 
-// LimaVersion returns the installed Lima version (e.g. "2.3.0"), or "" if it
+// queryLimaVersion returns the installed Lima version (e.g. "2.3.0"), or "" if it
 // can't be determined.
-func LimaVersion() string {
+func queryLimaVersion() string {
 	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "limactl", "--version").Output()

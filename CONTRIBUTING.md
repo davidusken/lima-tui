@@ -34,8 +34,9 @@ make build    # build ./lima-tui
    make lint    # golangci-lint, if you have it installed
    ```
 4. Try your change against real Lima VMs (start/stop/connect, both built-in themes and a skin with `bg: default` if you touched the UI).
-5. If you change key bindings, update `handleKey` in `app.go`, `keyHelp` in `ui.go`,
-   `headerHints` in `header.go` and the table in `README.md`.
+5. Key bindings live in one table, `bindings` in `keys.go`; the key handler, help
+   panel, header and status bar are built from it. Also update the table in
+   `README.md` (`TestReadmeListsEveryKey` fails if a key is missing there).
 6. Open the PR with a short description of what changed and why. Screenshots help for UI changes.
 
 CI checks gofmt and runs vet, tests and golangci-lint on macOS and Linux for every PR.
@@ -51,12 +52,14 @@ Commits starting with `docs:`, `chore:` or `test:` are left out of release notes
 | File | What's in it |
 |---|---|
 | `main.go` | Flags and startup |
-| `app.go` | App state, key handling, background refresh, status bar |
+| `app.go` | App state, background refresh, status bar |
+| `keys.go` | The key binding table and the key handler |
 | `actions.go` | Connect, start/stop, restart, delete |
 | `ui.go` | Layout, table rendering, help panel |
 | `header.go` | Info block and key hints at the top |
 | `theme.go` | The `theme` struct, built-in dark/light themes, applying a theme |
-| `skin.go` | Loading YAML skins and `config.yaml` |
+| `skin.go` | Parsing YAML skins and loading the theme list |
+| `config.go` | Config folder, `config.yaml`, and resolving `--skin` / `skin:` |
 | `vm.go` | Talking to `limactl` and formatting its output |
 
 All `limactl` calls run off the UI goroutine; UI state is only changed inside

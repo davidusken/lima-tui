@@ -129,7 +129,7 @@ func TestLoadThemes(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "skins", "dark.yaml"), "fg: red\n")
 	writeFile(t, filepath.Join(dir, "skins", "README.md"), "not a skin")
 
-	themes, idx, warnings, err := loadThemes(dir, "")
+	themes, idx, warnings, err := loadThemes(dir, skinRef{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,19 +143,19 @@ func TestLoadThemes(t *testing.T) {
 		t.Errorf("want warnings for broken.yaml and dark.yaml, got %q", warnings)
 	}
 
-	_, idx, _, err = loadThemes(dir, "zed")
+	_, idx, _, err = loadThemes(dir, skinRef{name: "zed"})
 	if err != nil || idx != 3 {
 		t.Errorf("want zed at 3, got %d, %v", idx, err)
 	}
-	_, idx, _, err = loadThemes(dir, "light")
+	_, idx, _, err = loadThemes(dir, skinRef{name: "light"})
 	if err != nil || idx != 1 {
 		t.Errorf("want light at 1, got %d, %v", idx, err)
 	}
 
-	if _, _, _, err := loadThemes(dir, "missing"); err == nil {
+	if _, _, _, err := loadThemes(dir, skinRef{name: "missing"}); err == nil {
 		t.Error("missing skin: want error")
 	}
-	if _, _, _, err := loadThemes(dir, "broken"); err == nil || !strings.Contains(err.Error(), "fg") {
+	if _, _, _, err := loadThemes(dir, skinRef{name: "broken"}); err == nil || !strings.Contains(err.Error(), "fg") {
 		t.Errorf("asked-for broken skin: want its error, got %v", err)
 	}
 }
@@ -165,7 +165,7 @@ func TestLoadThemesByPath(t *testing.T) {
 	other := filepath.Join(t.TempDir(), "elsewhere.yaml")
 	writeFile(t, other, "bg: default\n")
 
-	themes, idx, _, err := loadThemes(dir, other)
+	themes, idx, _, err := loadThemes(dir, skinRef{path: other})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,33 +232,39 @@ func TestColorTag(t *testing.T) {
 	}
 }
 
-func TestLoadThemesBareFileName(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "skins", "mine.yaml"), "fg: red\n")
-	t.Chdir(t.TempDir()) // no mine.yaml here
+func TestFlagSkin(t *testing.T) {
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	writeFile(t, filepath.Join(cwd, "here.yaml"), "")
 
-	themes, idx, _, err := loadThemes(dir, "mine.yaml")
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]skinRef{
+		"":               {},
+		"solarized-dark": {name: "solarized-dark"},
+		"here.yaml":      {path: "here.yaml"},                                 // in the current directory
+		"mine.yaml":      {path: filepath.Join("/cfg", "skins", "mine.yaml")}, // not here: skins folder
+		"./mine.yaml":    {path: "./mine.yaml"},                               // explicit path stays
+		"/abs/foo.yaml":  {path: "/abs/foo.yaml"},
 	}
-	if themes[idx].name != "mine" || themes[idx].fg != tcell.ColorRed {
-		t.Errorf("got %+v", themes[idx])
+	for in, want := range tests {
+		if got := flagSkin("/cfg", in); got != want {
+			t.Errorf("flagSkin(%q) = %+v, want %+v", in, got, want)
+		}
 	}
 }
 
 func TestConfigSkin(t *testing.T) {
 	home := userHome()
-	tests := map[string]string{
-		"":                 "",
-		"solarized-dark":   "solarized-dark",
-		"foo.yaml":         filepath.Join("/cfg", "skins", "foo.yaml"),
-		"sub/foo.yaml":     filepath.Join("/cfg", "sub", "foo.yaml"),
-		"/abs/foo.yaml":    "/abs/foo.yaml",
-		"~/skins/foo.yaml": filepath.Join(home, "skins", "foo.yaml"),
+	tests := map[string]skinRef{
+		"":                 {},
+		"solarized-dark":   {name: "solarized-dark"},
+		"foo.yaml":         {path: filepath.Join("/cfg", "skins", "foo.yaml")},
+		"sub/foo.yaml":     {path: filepath.Join("/cfg", "sub", "foo.yaml")},
+		"/abs/foo.yaml":    {path: "/abs/foo.yaml"},
+		"~/skins/foo.yaml": {path: filepath.Join(home, "skins", "foo.yaml")},
 	}
 	for in, want := range tests {
 		if got := configSkin("/cfg", in); got != want {
-			t.Errorf("configSkin(%q) = %q, want %q", in, got, want)
+			t.Errorf("configSkin(%q) = %+v, want %+v", in, got, want)
 		}
 	}
 }
