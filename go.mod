@@ -3,9 +3,9 @@ module github.com/davidusken/lima-tui
 go 1.26
 
 require (
-	github.com/gdamore/tcell/v2 v2.13.8
+	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/rivo/tview v0.42.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.6
 )
 
 require (
