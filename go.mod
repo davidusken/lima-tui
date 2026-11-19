@@ -1,4 +1,4 @@
-module github.com/robotmaxtron/lima-tui
+module github.com/davidusken/lima-tui
 
 go 1.26
 

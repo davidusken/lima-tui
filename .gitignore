@@ -1,6 +1,10 @@
 # Binaries
-lima-tui*
+/lima-tui
+/lima-tui-*
 *.exe
+
+# GoReleaser output
+dist/
 
 # Go build cache
 .cache/

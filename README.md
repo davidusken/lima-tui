@@ -12,33 +12,35 @@ with features such as:
 
 ## Installation
 
-### Prerequisites
-- Go 1.26+ installed
-- Lima installed and working
-- Access to `limactl` command
+Requires [Lima](https://lima-vm.io/) installed, with `limactl` on your `PATH`.
+
+### Homebrew (macOS)
+```bash
+brew install davidusken/tap/lima-tui
+```
+
+### Go
+```bash
+go install github.com/davidusken/lima-tui@latest
+```
+
+### Prebuilt binaries
+Download the archive for your platform (macOS/Linux, amd64/arm64) from the
+[releases page](https://github.com/davidusken/lima-tui/releases), extract it and
+put `lima-tui` somewhere on your `PATH`.
 
 ### Build from source
-```go
-go get .      // Install dependencies
-go build .    // Build the binary
-go install .  // Install to your $GOBIN path
-```
-
-### Binary Releases
-Install latest
 ```bash
-go install github.com/robotmaxtron/lima-tui@latest
+git clone https://github.com/davidusken/lima-tui.git
+cd lima-tui
+make build     # or: go build .
 ```
-
 
 ## Usage
 
-```go
-// Run the TUI
-go run .
-
-// Or if installed globally
-lima-tui
+```bash
+lima-tui            # start the TUI
+lima-tui --version  # print version
 ```
 
 ## Controls
@@ -86,7 +88,8 @@ lima-tui/
 ├── theme.go         # UI theming and styling
 ├── go.mod           # Go module definition
 ├── go.sum           # Dependency versions (auto-generated)
-├── Makefile         # Build automation
+├── Makefile         # Build shortcuts
+├── .goreleaser.yaml # Release builds + Homebrew cask
 └── README.md        # This file
 ```
 
@@ -105,3 +108,17 @@ lima-tui/
 - Ensure Go 1.26+ is installed: `go version`
 - Run `go mod tidy` to fix dependencies
 - Check network access for Go modules
+
+## Contributing
+
+Pull requests are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Releasing
+
+Push a tag like `v1.1.0`. The `release` workflow runs GoReleaser, which builds
+the binaries, publishes a GitHub release and updates the Homebrew tap.
+Run `make snapshot` to try the release build locally without publishing.
+
+## License
+
+[MIT](LICENSE)
